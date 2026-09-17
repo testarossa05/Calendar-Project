@@ -48,6 +48,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_check = sub.add_parser("check", help="validate config and confirm every source loads")
     _add_common(p_check)
 
+    p_doctor = sub.add_parser(
+        "doctor", help="diagnose the environment, dependencies, permissions and sources"
+    )
+    _add_common(p_doctor)
+    p_doctor.add_argument(
+        "--no-probe", action="store_true", help="skip contacting the sources"
+    )
+
     p_agenda = sub.add_parser("agenda", help="print the merged agenda without writing anywhere")
     _add_common(p_agenda)
     p_agenda.add_argument("-d", "--days", type=int, default=14, help="days ahead (default: 14)")
@@ -103,6 +111,12 @@ def cmd_check(args) -> int:
         return 2
     print("\nAll sources reachable.")
     return 0
+
+
+def cmd_doctor(args) -> int:
+    from . import doctor
+
+    return doctor.run(args.config, probe_sources=not args.no_probe)
 
 
 def cmd_agenda(args) -> int:
@@ -184,6 +198,7 @@ def main(argv=None) -> int:
     handlers = {
         "sync": cmd_sync,
         "check": cmd_check,
+        "doctor": cmd_doctor,
         "agenda": cmd_agenda,
         "google-auth": cmd_google_auth,
         "google-calendars": cmd_google_calendars,

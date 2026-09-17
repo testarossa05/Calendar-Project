@@ -29,11 +29,23 @@ iCloud  ───────── caldav                ┘
 
 ## 빠른 시작
 
+**Mac**
+
+```bash
+./scripts/install-macos.sh     # 가상환경, 의존성, config.yaml, 진단까지 한 번에
+./scripts/install-launchd.sh   # 15분 주기 자동 실행 등록
+```
+
+**그 외**
+
 ```bash
 pip install -r requirements.txt
 cp config.example.yaml config.yaml     # config.yaml은 git에 올라가지 않음
 export PYTHONPATH=src
+```
 
+```bash
+python -m calhub doctor       # 환경/권한/설정/소스 연결을 한 번에 진단
 python -m calhub check        # 설정 검증 + 모든 소스 연결 확인
 python -m calhub agenda -d 7  # 통합 결과를 터미널에서 미리보기 (아무것도 쓰지 않음)
 python -m calhub sync -n      # 무엇이 바뀔지만 출력 (dry-run)
@@ -46,6 +58,7 @@ python -m calhub sync         # 실제 동기화
 |---|---|
 | `sync` | 수집 → 병합 → 모든 sink에 기록. `-n` dry-run, `--force` 안전장치 무시 |
 | `check` | 설정 파일과 모든 소스 연결을 검증 |
+| `doctor` | 환경·의존성·macOS 권한·설정·소스를 진단하고 해결법 출력. `--no-probe`로 환경만 |
 | `agenda -d N` | 향후 N일 통합 일정을 터미널에 출력 |
 | `google-auth <client.json>` | Google OAuth 토큰 1회 발급 |
 | `google-calendars` | 자격증명이 접근 가능한 Google 캘린더 목록 |

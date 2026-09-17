@@ -15,9 +15,23 @@
 
 ## 1. 사전 준비
 
+### Mac (권장 — 자동 설치)
+
 ```bash
-git clone https://github.com/testarossa05/PTKR-Mechanical-Sales-Ontology-Hub.git
-cd PTKR-Mechanical-Sales-Ontology-Hub
+git clone https://github.com/testarossa05/Calendar-Project.git
+cd Calendar-Project
+./scripts/install-macos.sh
+```
+
+이 스크립트가 Python 3.11+ 확인, 가상환경 생성, 의존성 설치(EventKit 바인딩 포함),
+`config.yaml` 복사, 진단 실행까지 처리한다. 재실행해도 기존 `config.yaml`은
+덮어쓰지 않는다.
+
+### 그 외 환경 (수동)
+
+```bash
+git clone https://github.com/testarossa05/Calendar-Project.git
+cd Calendar-Project
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp config.example.yaml config.yaml
@@ -27,7 +41,15 @@ export PYTHONPATH=src
 `config.yaml`은 `.gitignore`에 포함되어 있다. 토큰은 이 파일에 직접 적지 말고
 `${ENV_VAR}` 형태로만 참조한다.
 
----
+### 문제가 생기면 먼저 이것부터
+
+```bash
+python -m calhub doctor
+```
+
+Python 버전, 의존성, macOS 캘린더 권한, 설정 파일, 그리고 **각 소스의 실제 연결**을
+순서대로 점검하고 문제마다 해결 방법을 함께 출력한다. 소스 접속 없이 환경만
+보려면 `--no-probe`를 붙인다.
 
 ## 2. 소스별 설정
 
@@ -259,7 +281,34 @@ export ICLOUD_APP_PASSWORD='xxxx-xxxx-xxxx-xxxx'
 
 ---
 
-## 4. 자동 실행 (GitHub Actions)
+## 4-A. 자동 실행 — Mac (EventKit 경로를 쓸 때)
+
+EventKit은 Mac에서만 동작하므로 GitHub Actions가 아니라 Mac에서 주기 실행한다.
+
+```bash
+./scripts/install-launchd.sh          # 기본 15분 주기
+./scripts/install-launchd.sh 600      # 10분 주기로 바꾸려면
+```
+
+launchd는 macOS가 지원하는 정식 스케줄러다. cron도 동작하지만 deprecated이며
+시스템 업그레이드 시 유실될 수 있다.
+
+| 작업 | 명령 |
+|---|---|
+| 상태 확인 | `launchctl print gui/$(id -u)/com.calhub.sync \| head -20` |
+| 즉시 실행 | `launchctl kickstart -k gui/$(id -u)/com.calhub.sync` |
+| 로그 | `tail -f ~/Library/Logs/calhub/sync.log` |
+| 오류 로그 | `tail -f ~/Library/Logs/calhub/sync.err.log` |
+| 제거 | `./scripts/install-launchd.sh --uninstall` |
+
+**Mac이 잠들면 동기화가 멈춘다.** 다만 직전까지 미러링된 일정은 Google 캘린더에
+남아 있으므로 아이폰에서는 계속 보인다. 새 회의 반영만 다음 실행까지 지연된다.
+회사 노트북이 평일 업무시간에 켜져 있다면 실무상 충분하다.
+
+동일 라벨의 작업이 겹쳐 실행되지는 않는다. launchd가 이전 실행이 끝나기 전에는
+다음 실행을 시작하지 않는다.
+
+## 4-B. 자동 실행 (GitHub Actions)
 
 저장소 Secrets에 등록할 항목:
 
@@ -295,7 +344,9 @@ export ICLOUD_APP_PASSWORD='xxxx-xxxx-xxxx-xxxx'
 | Graph `401` / `silent token refresh failed` | 캐시된 로그인 만료. `ms-auth` 재실행 |
 | Graph `403` | 앱에 위임 `Calendars.Read` 권한이 없다 |
 | device flow 시작 실패 | 앱 등록에서 "공용 클라이언트 흐름 허용"이 꺼져 있다 |
-| EventKit이 캘린더 0개 | macOS 캘린더 접근 권한 미승인. 시스템 설정에서 허용 |
+| EventKit이 캘린더 0개 | macOS 캘린더 접근 권한 미승인. 시스템 설정 → 개인정보 보호 및 보안 → 캘린더 |
+| launchd 작업이 안 돌아감 | `launchctl print gui/$(id -u)/com.calhub.sync`로 상태 확인, `~/Library/Logs/calhub/sync.err.log` 확인 |
+| Mac이 잠든 동안 갱신 안 됨 | 정상 동작. 기존 일정은 유지되며 새 변경만 지연됨 |
 | `source(s) failed: ... 이전 버전을 유지` | 의도된 동작. 소스를 고치거나 `--force` |
 | `max_delete_ratio` 초과로 중단 | 소스가 대량 누락됐을 가능성. `sync -n`으로 확인 후 `--force` |
 | 아이폰에 반영이 느림 | iOS 구독 캘린더 새로고침 주기 제한. 방법 A(Google)가 더 빠름 |
@@ -304,6 +355,7 @@ export ICLOUD_APP_PASSWORD='xxxx-xxxx-xxxx-xxxx'
 진단은 항상 이 순서로:
 
 ```bash
+python -m calhub doctor       # 환경·권한·설정·소스를 한 번에
 python -m calhub check        # 어느 소스가 실패하는지
 python -m calhub agenda -d 7  # 데이터가 제대로 들어오는지
 python -m calhub sync -n      # 무엇을 쓰려 하는지
