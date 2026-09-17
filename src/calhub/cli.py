@@ -15,6 +15,7 @@ from datetime import datetime
 
 from . import __version__
 from .config import ConfigError, load_config
+from .msauth import MsAuthError
 from .sync import collect, run
 from .util import get_tz, parse_window
 
@@ -59,6 +60,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_cal = sub.add_parser("google-calendars", help="list Google calendars the credential can see")
     _add_common(p_cal)
+
+    p_ms = sub.add_parser(
+        "ms-auth", help="sign in to Microsoft Graph once and save a reusable token cache"
+    )
+    p_ms.add_argument("--client-id", required=True, help="Entra ID application (client) id")
+    p_ms.add_argument(
+        "--tenant-id",
+        default="organizations",
+        help="tenant id or domain (default: organizations)",
+    )
+    p_ms.add_argument(
+        "-o", "--out", default="secrets/ms_token_cache.json", help="where to write the cache"
+    )
 
     return parser
 
@@ -152,6 +166,18 @@ def cmd_google_calendars(args) -> int:
     return 0
 
 
+def cmd_ms_auth(args) -> int:
+    from .msauth import device_code_login
+
+    path = device_code_login(args.client_id, args.tenant_id, args.out)
+    print(f"\nToken cache written to {path}")
+    print("Point 'token_cache' at this path, or paste its contents into the")
+    print("MS_TOKEN_CACHE secret for automated runs.")
+    print("\nThe cache holds a refresh token. Treat it like a password: it is")
+    print("git-ignored here, and must not be committed or shared.")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -161,9 +187,13 @@ def main(argv=None) -> int:
         "agenda": cmd_agenda,
         "google-auth": cmd_google_auth,
         "google-calendars": cmd_google_calendars,
+        "ms-auth": cmd_ms_auth,
     }
     try:
         return handlers[args.command](args)
+    except MsAuthError as exc:
+        print(f"Microsoft sign-in error: {exc}", file=sys.stderr)
+        return 1
     except ConfigError as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return 1

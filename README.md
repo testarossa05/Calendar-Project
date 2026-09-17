@@ -4,10 +4,13 @@ Outlook/Teams, Notion, Google Calendar, iCloud에 흩어진 일정을 **하나�
 통합해 아이폰에서 한 눈에 보기 위한 동기화 엔진.
 
 ```
-Outlook (ICS)  ─┐
-Notion (API)   ─┤                        ┌─→ unified.ics  → 아이폰 "구독 캘린더"
-Google (API)   ─┼─→ 정규화 → 중복제거 ──┤
-iCloud (CalDAV)─┘                        └─→ Google 전용 캘린더 → 아이폰 계정 동기화
+Outlook/Teams ─┬─ msgraph  (위임 권한)  ─┐
+               ├─ eventkit (Mac 로컬)   │
+               └─ ics      (게시 링크)  │   ┌─→ unified.ics → 아이폰 "구독 캘린더"
+Notion  ───────── notion / ics          ├──→┤
+Google  ───────── google                │   └─→ Google 전용 캘린더 → 아이폰 계정 동기화
+iCloud  ───────── caldav                ┘
+                                    정규화 → 중복제거
 ```
 
 ## 왜 네이티브 앱이 아닌가
@@ -46,18 +49,35 @@ python -m calhub sync         # 실제 동기화
 | `agenda -d N` | 향후 N일 통합 일정을 터미널에 출력 |
 | `google-auth <client.json>` | Google OAuth 토큰 1회 발급 |
 | `google-calendars` | 자격증명이 접근 가능한 Google 캘린더 목록 |
+| `ms-auth --client-id ...` | Microsoft Graph 1회 로그인, 토큰 캐시 저장 |
 
 ## 소스(Source)
 
-| kind | 대상 | 인증 | 관리자 승인 |
+| kind | 대상 | 인증 | 테넌트에 필요한 것 |
 |---|---|---|---|
-| `ics` | Outlook/Teams, Notion, iCloud 공유, 기타 모든 ICS | 없음 (URL만) | **불필요** |
-| `notion` | Notion 데이터베이스 | Integration Token | 불필요 |
-| `google` | Google Calendar | 서비스 계정 또는 OAuth | 불필요 |
-| `caldav` | iCloud, 기타 CalDAV | 앱 전용 암호 | 불필요 |
+| `msgraph` | Outlook/Teams | Entra 앱 등록 + device code | 앱 등록 허용, `Calendars.Read` 위임 |
+| `eventkit` | Mac에 동기화된 로컬 캘린더 | macOS 권한 승인 | **없음** |
+| `ics` | 게시된 ICS, Notion, iCloud 공유 등 | 없음 (URL만) | 캘린더 게시 허용 |
+| `notion` | Notion 데이터베이스 | Integration Token | 해당 없음 |
+| `google` | Google Calendar | 서비스 계정 또는 OAuth | 해당 없음 |
+| `caldav` | iCloud, 기타 CalDAV | 앱 전용 암호 | 해당 없음 |
 
-`ics` 어댑터가 M365 우회의 핵심이다. Outlook 웹 → 설정 → 캘린더 → 공유 캘린더 →
-"캘린더 게시"로 ICS 링크를 얻으면 Azure AD 앱 등록 없이 회사 일정을 읽을 수 있다.
+### 회사 M365 접근 경로
+
+조직 정책으로 "캘린더 게시"가 차단된 환경을 전제로 세 경로를 제공한다. 중요한 점은
+**게시 차단과 앱 등록 차단이 서로 다른 정책**이라는 것이다 — 전자는 Exchange의
+`SharingPolicy`, 후자는 Entra ID의 `Users can register applications`다.
+
+1. **`msgraph`** — 위임 권한 `Calendars.Read`로 본인 사서함만 읽는다. 테넌트 전체를
+   읽는 응용 프로그램 권한과 달리 사용자 동의로 끝나는 경우가 많다. 서버에서
+   무인 실행이 가능하다.
+2. **`eventkit`** — Mac의 Outlook/캘린더 앱이 **이미 내려받은** 데이터를 로컬에서
+   읽는다. 테넌트 변경이 전혀 필요 없다. 단 Mac이 깨어 있을 때만 동작한다.
+3. **`ics`** — 게시가 허용된 환경에서 가장 간단하다.
+
+어느 경로도 접근 통제를 우회하지 않는다. 모두 본인에게 이미 허가된 데이터를
+본인이 접근하는 방식이다. 자세한 설정과 오류별 판별법은
+[docs/SETUP-ko.md](docs/SETUP-ko.md) 참조.
 
 ## 싱크(Sink)
 

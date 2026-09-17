@@ -23,22 +23,46 @@ delete_guard_min_events: 10
 
 sources:
   # ---------------------------------------------------------------------------
-  # 1. Microsoft 365 / Teams  -- via a published ICS link.
+  # 1. Microsoft 365 / Teams
   #
-  # This route needs NO Azure app registration and NO administrator consent, which
-  # is why it is the default here. In Outlook on the web:
-  #   Settings -> Calendar -> Shared calendars -> Publish a calendar
-  #   -> pick the calendar -> "Can view all details" -> Publish -> copy the ICS link
-  #
-  # If your tenant has disabled publishing, see docs/SETUP-ko.md for the fallbacks.
+  # Pick ONE of the three routes below. They are ordered by how much they need
+  # from the tenant, least first. Teams meetings live in the Outlook calendar, so
+  # reading that calendar is all that is required.
   # ---------------------------------------------------------------------------
+
+  # 1a. Microsoft Graph -- delegated Calendars.Read on your own mailbox.
+  #     Worth trying even when "Publish a calendar" is blocked: publishing is
+  #     governed by Exchange's SharingPolicy, app registration by Entra ID's
+  #     "users can register applications". They are separate settings.
+  #     Set up:  python -m calhub ms-auth --client-id <id> --tenant-id <tenant>
   - id: outlook
-    kind: ics
+    kind: msgraph
     priority: 10          # lower number wins a duplicate; work calendar is truth
-    url: ${OUTLOOK_ICS_URL}
+    client_id: ${MS_CLIENT_ID}
+    tenant_id: ${MS_TENANT_ID}
+    token_cache: ${MS_TOKEN_CACHE}
     prefix: "[Work] "
     skip_declined: true
-    # privacy: busy       # uncomment to mirror only the time, never the subject
+    # privacy: busy       # mirror only the time, never the subject
+
+  # 1b. macOS EventKit -- reads calendars already synced to this Mac.
+  #     Needs nothing from the tenant at all: it reads what the approved Outlook
+  #     or Calendar.app client has already downloaded. Runs only on macOS, and
+  #     only while the Mac is awake.
+  #     Requires: pip install pyobjc-framework-EventKit
+  # - id: outlook
+  #   kind: eventkit
+  #   priority: 10
+  #   calendars: ["Calendar"]     # omit to read every local calendar
+  #   prefix: "[Work] "
+
+  # 1c. Published ICS link -- simplest, but blocked by policy in many tenants.
+  #     Outlook web -> Settings -> Calendar -> Shared calendars -> Publish a calendar
+  # - id: outlook
+  #   kind: ics
+  #   priority: 10
+  #   url: ${OUTLOOK_ICS_URL}
+  #   prefix: "[Work] "
 
   # ---------------------------------------------------------------------------
   # 2. Notion -- via the API (richer than Notion's own ICS export).

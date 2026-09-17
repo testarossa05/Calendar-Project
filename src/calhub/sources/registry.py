@@ -5,15 +5,19 @@ from __future__ import annotations
 from ..config import Config, SourceConfig
 from .base import Source
 from .caldav_source import CalDavSource
+from .eventkit_source import EventKitSource
 from .google_source import GoogleSource
 from .ics_source import IcsSource
+from .msgraph_source import MsGraphSource
 from .notion_source import NotionSource
 
 SOURCE_TYPES: dict[str, type[Source]] = {
     IcsSource.kind: IcsSource,
+    MsGraphSource.kind: MsGraphSource,
     NotionSource.kind: NotionSource,
     GoogleSource.kind: GoogleSource,
     CalDavSource.kind: CalDavSource,
+    EventKitSource.kind: EventKitSource,
 }
 
 

@@ -67,6 +67,9 @@ jobs:
         env:
           PYTHONPATH: src
           OUTLOOK_ICS_URL: ${{ secrets.OUTLOOK_ICS_URL }}
+          MS_CLIENT_ID: ${{ secrets.MS_CLIENT_ID }}
+          MS_TENANT_ID: ${{ secrets.MS_TENANT_ID }}
+          MS_TOKEN_CACHE: ${{ secrets.MS_TOKEN_CACHE }}
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
