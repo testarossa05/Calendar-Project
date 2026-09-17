@@ -1,5 +1,8 @@
 # 설치 및 설정 가이드
 
+> 처음 설치한다면 이 문서보다 [VERIFY-ko.md](VERIFY-ko.md)를 먼저 볼 것.
+> 검증 순서가 단계별로 정리되어 있고, 각 단계에서 이 문서의 해당 절을 참조한다.
+
 ## 0. 결론 먼저
 
 | 항목 | 권장안 | 이유 |
@@ -33,10 +36,12 @@ cd Calendar-Project
 git clone https://github.com/testarossa05/Calendar-Project.git
 cd Calendar-Project
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e .
 cp config.example.yaml config.yaml
-export PYTHONPATH=src
 ```
+
+`pip install -e .`로 설치하면 `calhub` 명령이 venv의 PATH에 등록된다.
+새 터미널에서는 `source .venv/bin/activate`를 먼저 실행해야 한다.
 
 `config.yaml`은 `.gitignore`에 포함되어 있다. 토큰은 이 파일에 직접 적지 말고
 `${ENV_VAR}` 형태로만 참조한다.
@@ -44,7 +49,7 @@ export PYTHONPATH=src
 ### 문제가 생기면 먼저 이것부터
 
 ```bash
-python -m calhub doctor
+calhub doctor
 ```
 
 Python 버전, 의존성, macOS 캘린더 권한, 설정 파일, 그리고 **각 소스의 실제 연결**을
@@ -82,7 +87,7 @@ Teams 회의는 실제로는 Outlook 캘린더에 저장된다. 따라서 Outloo
 4. 개요 탭에서 **애플리케이션(클라이언트) ID** 와 **디렉터리(테넌트) ID** 복사
 
 ```bash
-python -m calhub ms-auth --client-id <클라이언트ID> --tenant-id <테넌트ID>
+calhub ms-auth --client-id <클라이언트ID> --tenant-id <테넌트ID>
 # 터미널에 표시된 URL과 코드를 브라우저에 입력해 1회 로그인
 export MS_CLIENT_ID='...'
 export MS_TENANT_ID='...'
@@ -138,7 +143,7 @@ Mac에서 주기 실행하고, 결과를 Google sink로 밀어 넣는 구성이 
 
 ```bash
 # 예: 15분마다. crontab -e
-*/15 * * * * cd ~/calhub && PYTHONPATH=src .venv/bin/python -m calhub sync -q
+*/15 * * * * cd ~/Calendar-Project && .venv/bin/calhub sync -q
 ```
 
 Mac이 잠들어 있는 동안에는 갱신이 멈추지만, **직전까지의 일정은 Google 캘린더에
@@ -210,13 +215,13 @@ export NOTION_DATABASE_ID='a1b2c3d4e5f6...'
 
 ```bash
 export GOOGLE_SERVICE_ACCOUNT_JSON="$(cat ~/secrets/sa.json)"   # 내용 또는 경로 모두 가능
-python -m calhub google-calendars      # 접근 가능한 캘린더 ID 확인
+calhub google-calendars      # 접근 가능한 캘린더 ID 확인
 ```
 
 **OAuth 방식 (Workspace가 서비스 계정 공유를 막는 경우)**
 
 ```bash
-python -m calhub google-auth ~/Downloads/client_secret.json -o secrets/google_token.json
+calhub google-auth ~/Downloads/client_secret.json -o secrets/google_token.json
 export GOOGLE_TOKEN_JSON="$(cat secrets/google_token.json)"
 ```
 
@@ -418,7 +423,7 @@ launchd는 macOS가 지원하는 정식 스케줄러다. cron도 동작하지만
 
 ```bash
 # 예: 맥에서 10분마다 실행
-*/10 * * * * cd ~/calhub && PYTHONPATH=src .venv/bin/python -m calhub sync -q
+*/10 * * * * cd ~/Calendar-Project && .venv/bin/calhub sync -q
 ```
 
 ---
@@ -447,10 +452,10 @@ launchd는 macOS가 지원하는 정식 스케줄러다. cron도 동작하지만
 진단은 항상 이 순서로:
 
 ```bash
-python -m calhub doctor       # 환경·권한·설정·소스를 한 번에
-python -m calhub check        # 어느 소스가 실패하는지
-python -m calhub agenda -d 7  # 데이터가 제대로 들어오는지
-python -m calhub sync -n      # 무엇을 쓰려 하는지
+calhub doctor       # 환경·권한·설정·소스를 한 번에
+calhub check        # 어느 소스가 실패하는지
+calhub agenda -d 7  # 데이터가 제대로 들어오는지
+calhub sync -n      # 무엇을 쓰려 하는지
 ```
 
 ---

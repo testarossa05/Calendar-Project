@@ -42,8 +42,10 @@ fi
 source .venv/bin/activate
 python -m pip install --quiet --upgrade pip
 
-say "3/5  Installing dependencies"
-python -m pip install --quiet -r requirements.txt
+say "3/5  Installing calhub and its dependencies"
+# Editable install puts the `calhub` command on PATH inside the venv, so no
+# PYTHONPATH juggling is needed for any later command.
+python -m pip install --quiet -e .
 echo "   done (including pyobjc-framework-EventKit for the local calendar route)"
 
 say "4/5  Preparing the configuration"
@@ -59,7 +61,7 @@ mkdir -p secrets && chmod 700 secrets
 say "5/5  Diagnostics"
 # The first EventKit read triggers the macOS permission prompt; --no-probe keeps
 # this step from blocking on it before the user has edited the config.
-PYTHONPATH=src python -m calhub doctor --no-probe || true
+calhub doctor --no-probe || true
 
 cat <<EOF
 
@@ -67,10 +69,12 @@ Next steps
   1. Edit config.yaml and enable the sources you want.
   2. Verify everything is reachable:
        cd "$ROOT" && source .venv/bin/activate
-       PYTHONPATH=src python -m calhub doctor
+       calhub doctor
      macOS will ask for calendar access on the first EventKit read. Approve it.
   3. Preview the merge without writing anything:
-       PYTHONPATH=src python -m calhub agenda -d 7
+       calhub agenda -d 7
   4. Schedule it:
        ./scripts/install-launchd.sh
+
+  Full step-by-step verification order: docs/VERIFY-ko.md
 EOF

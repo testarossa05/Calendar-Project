@@ -27,7 +27,7 @@ fi
 
 INTERVAL="${1:-900}"
 [ "$INTERVAL" -ge 60 ] 2>/dev/null || die "interval must be an integer of at least 60 seconds"
-[ -x .venv/bin/python ] || die "no virtualenv found. Run ./scripts/install-macos.sh first."
+[ -x .venv/bin/calhub ] || die "calhub is not installed in .venv. Run ./scripts/install-macos.sh first."
 [ -f config.yaml ] || die "no config.yaml found. Run ./scripts/install-macos.sh first."
 
 mkdir -p "$LOG_DIR" "$(dirname "$PLIST")"
@@ -44,21 +44,13 @@ cat > "$PLIST" <<PLISTEOF
 
   <key>ProgramArguments</key>
   <array>
-    <string>$ROOT/.venv/bin/python</string>
-    <string>-m</string>
-    <string>calhub</string>
+    <string>$ROOT/.venv/bin/calhub</string>
     <string>sync</string>
     <string>--quiet</string>
   </array>
 
   <key>WorkingDirectory</key>
   <string>$ROOT</string>
-
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>PYTHONPATH</key>
-    <string>$ROOT/src</string>
-  </dict>
 
   <key>StartInterval</key>
   <integer>$INTERVAL</integer>

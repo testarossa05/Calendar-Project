@@ -159,3 +159,31 @@ def test_config_file_round_trip(tmp_path):
     cfg = load_config(FIXTURES / "config_test.yaml")
     assert cfg.timezone == "Asia/Seoul"
     assert {s.id for s in cfg.active_sources} == {"outlook", "notion"}
+
+
+class TestPlanOutput:
+    """The dry-run report is a diagnostic tool, so its dates must be local.
+
+    Events are UTC internally; printing that raw puts a Seoul all-day event on
+    the previous day, which reads exactly like an off-by-one bug.
+    """
+
+    def test_dry_run_dates_match_agenda_dates(self, tmp_path, capsys):
+        from calhub.util import get_tz
+
+        cfg, _ = make_config(tmp_path)
+        run(cfg, dry_run=True, now=NOW, verbose=True)
+        printed = capsys.readouterr().out
+
+        result = run(cfg, dry_run=True, now=NOW, verbose=False)
+        seoul = get_tz("Asia/Seoul")
+        all_day = [e for e in result.events if e.all_day]
+        assert all_day, "fixture must contain an all-day event for this to mean anything"
+        for event in all_day:
+            local = event.start.astimezone(seoul).date().isoformat()
+            utc = event.start.date().isoformat()
+            assert local != utc, "fixture must straddle midnight UTC to be a real test"
+            # Match the whole line, since an unrelated event may legitimately sit
+            # on the UTC date this one would wrongly print.
+            assert f"+ {local} {event.title}" in printed
+            assert f"+ {utc} {event.title}" not in printed

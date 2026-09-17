@@ -14,7 +14,7 @@ from .sources.base import SourceError
 from .sources.registry import build_source
 from .sinks.registry import build_sink
 from .transform import apply_source_rules, should_keep
-from .util import parse_window
+from .util import get_tz, parse_window
 
 
 @dataclass
@@ -111,11 +111,12 @@ def run(
         result.duplicates_dropped = dropped
         result.dropped_pairs = pairs
         if verbose and dropped:
+            zone = get_tz(config.timezone)
             print(f"\nDeduplicated: {dropped} duplicate(s) collapsed")
             for winner, loser in pairs[:10]:
                 print(
                     f"  kept {winner.ref.source_id:<12} dropped {loser.ref.source_id:<12} "
-                    f"{winner.start.date()} {winner.title[:48]!r}"
+                    f"{winner.start.astimezone(zone).date()} {winner.title[:48]!r}"
                 )
             if len(pairs) > 10:
                 print(f"  ... and {len(pairs) - 10} more")
@@ -135,7 +136,7 @@ def run(
             print(f"\nSink [{sink_cfg.kind}]: {plan.summary()}")
         if dry_run:
             if verbose:
-                _print_plan_detail(plan)
+                _print_plan_detail(plan, get_tz(config.timezone))
             continue
 
         guard = _partial_guard(config, result, force=force) or _deletion_guard(
@@ -154,13 +155,24 @@ def run(
     return result
 
 
-def _print_plan_detail(plan: SyncPlan, limit: int = 15) -> None:
+def _print_plan_detail(plan: SyncPlan, zone, limit: int = 15) -> None:
+    """Render a plan for a human.
+
+    Dates are shown in the configured display timezone. Events are stored as UTC
+    internally, and printing that raw would put a Seoul all-day event on the
+    previous day -- which reads exactly like the off-by-one bug this output is
+    meant to help diagnose.
+    """
+
+    def day(event) -> str:
+        return event.start.astimezone(zone).date().isoformat()
+
     for event in plan.to_create[:limit]:
-        print(f"  + {event.start.date()} {event.title[:60]}")
+        print(f"  + {day(event)} {event.title[:60]}")
     if len(plan.to_create) > limit:
         print(f"  + ... and {len(plan.to_create) - limit} more")
     for _, event in plan.to_update[:limit]:
-        print(f"  ~ {event.start.date()} {event.title[:60]}")
+        print(f"  ~ {day(event)} {event.title[:60]}")
     if len(plan.to_update) > limit:
         print(f"  ~ ... and {len(plan.to_update) - limit} more")
     for _, summary in plan.to_delete[:limit]:

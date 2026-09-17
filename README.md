@@ -39,17 +39,17 @@ iCloud  ───────── caldav                ┘
 **그 외**
 
 ```bash
-pip install -r requirements.txt
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e .
 cp config.example.yaml config.yaml     # config.yaml은 git에 올라가지 않음
-export PYTHONPATH=src
 ```
 
 ```bash
-python -m calhub doctor       # 환경/권한/설정/소스 연결을 한 번에 진단
-python -m calhub check        # 설정 검증 + 모든 소스 연결 확인
-python -m calhub agenda -d 7  # 통합 결과를 터미널에서 미리보기 (아무것도 쓰지 않음)
-python -m calhub sync -n      # 무엇이 바뀔지만 출력 (dry-run)
-python -m calhub sync         # 실제 동기화
+calhub doctor       # 환경/권한/설정/소스 연결을 한 번에 진단
+calhub check        # 설정 검증 + 모든 소스 연결 확인
+calhub agenda -d 7  # 통합 결과를 터미널에서 미리보기 (아무것도 쓰지 않음)
+calhub sync -n      # 무엇이 바뀔지만 출력 (dry-run)
+calhub sync         # 실제 동기화
 ```
 
 ## 명령어
@@ -148,6 +148,12 @@ python -m calhub sync         # 실제 동기화
 `.github/workflows/calendar-sync.yml`이 15분 주기로 동기화하고 GitHub Pages에
 게시한다. 활성화 전에 워크플로 파일 상단의 **PRIVACY WARNING**을 반드시 읽을 것.
 
+## 검증 순서
+
+처음 설치한다면 [docs/VERIFY-ko.md](docs/VERIFY-ko.md)의 순서대로 진행할 것.
+자격증명이 필요 없는 단계부터 올라가므로, 실패했을 때 원인이 한 곳으로 좁혀진다.
+5단계까지만 끝내도 실사용이 시작된다.
+
 ## 상세 설정
 
 소스별 단계별 설정, M365가 막혔을 때의 대안, 아이폰 구독 방법은
@@ -156,6 +162,6 @@ python -m calhub sync         # 실제 동기화
 ## 개발
 
 ```bash
-pip install -r requirements-dev.txt
-python -m pytest tests/ -v
+pip install -e '.[dev]'
+python -m pytest -v
 ```
