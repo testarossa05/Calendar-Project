@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# secrets - never commit
+config.yaml
+secrets/
+*.token.json
+token.json
+credentials.json
+service-account*.json
+.env
+
+# build output
+out/
+dist/

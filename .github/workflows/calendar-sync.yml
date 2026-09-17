@@ -1,0 +1,119 @@
+name: Calendar sync
+
+# Runs the merge on a schedule and publishes the unified .ics to GitHub Pages,
+# so the iPhone can subscribe to a single always-current URL.
+#
+# PRIVACY WARNING -- READ BEFORE ENABLING
+# GitHub Pages is served publicly. Anyone who knows the URL can read the calendar,
+# and there is no authentication on an .ics subscription URL by design: the iPhone
+# fetches it anonymously.
+#
+# Therefore:
+#   * PUBLISH_SLUG must be set to a long random string. It is the only thing making
+#     the URL unguessable. Generate one with:  openssl rand -hex 16
+#   * For a work calendar, set `privacy: busy` on that source so only time blocks
+#     are published and meeting subjects never leave the corporate boundary.
+#   * If meeting subjects must be visible on the phone, do NOT use this workflow.
+#     Use the `google` sink into a private calendar instead -- see docs/SETUP-ko.md.
+
+on:
+  schedule:
+    # Every 15 minutes. GitHub queues scheduled runs under load, so treat the
+    # cadence as "about every 15 minutes", not a hard guarantee.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Show the plan without publishing"
+        type: boolean
+        default: false
+
+concurrency:
+  group: calendar-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore previous publication
+        # The guards compare against what is already published; without this the
+        # run always looks like a first run.
+        uses: actions/cache@v4
+        with:
+          path: public
+          key: calhub-public-${{ github.run_id }}
+          restore-keys: calhub-public-
+
+      - name: Sync
+        env:
+          PYTHONPATH: src
+          OUTLOOK_ICS_URL: ${{ secrets.OUTLOOK_ICS_URL }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_SOURCE_CALENDAR_ID: ${{ secrets.GOOGLE_SOURCE_CALENDAR_ID }}
+          GOOGLE_TARGET_CALENDAR_ID: ${{ secrets.GOOGLE_TARGET_CALENDAR_ID }}
+          ICLOUD_USERNAME: ${{ secrets.ICLOUD_USERNAME }}
+          ICLOUD_APP_PASSWORD: ${{ secrets.ICLOUD_APP_PASSWORD }}
+          PUBLISH_SLUG: ${{ secrets.PUBLISH_SLUG }}
+        run: |
+          if [ -z "$PUBLISH_SLUG" ]; then
+            echo "::error::PUBLISH_SLUG secret is not set. It is what keeps the"
+            echo "::error::published calendar URL unguessable. Generate one with:"
+            echo "::error::  openssl rand -hex 16"
+            exit 1
+          fi
+          python -m calhub sync ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      - name: Guard against publishing an empty calendar
+        if: ${{ !inputs.dry_run }}
+        env:
+          PUBLISH_SLUG: ${{ secrets.PUBLISH_SLUG }}
+        run: |
+          feed="public/$PUBLISH_SLUG/unified.ics"
+          test -s "$feed" || { echo "::error::$feed missing or empty"; exit 1; }
+          count=$(grep -c '^BEGIN:VEVENT' "$feed" || true)
+          echo "Publishing $count events"
+          test "$count" -gt 0 || { echo "::error::no events to publish"; exit 1; }
+
+      - name: Keep the feed out of search engines
+        if: ${{ !inputs.dry_run }}
+        run: |
+          # Obscurity is the only access control an .ics URL has; at minimum keep
+          # crawlers from indexing it. The index page must not link to the feed.
+          printf 'User-agent: *\nDisallow: /\n' > public/robots.txt
+          cat > public/index.html <<'HTML'
+          <!doctype html><meta charset="utf-8">
+          <meta name="robots" content="noindex,nofollow">
+          <title>Calendar feed</title>
+          <p>Nothing to see here.</p>
+          HTML
+
+      - uses: actions/configure-pages@v5
+        if: ${{ !inputs.dry_run }}
+      - uses: actions/upload-pages-artifact@v3
+        if: ${{ !inputs.dry_run }}
+        with:
+          path: public
+      - id: deploy
+        if: ${{ !inputs.dry_run }}
+        uses: actions/deploy-pages@v4

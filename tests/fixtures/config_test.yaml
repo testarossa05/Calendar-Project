@@ -1,0 +1,23 @@
+timezone: Asia/Seoul
+back_days: 30
+forward_days: 90
+dedupe: true
+drop_shorter_than_minutes: 10
+
+sources:
+  - id: outlook
+    kind: ics
+    priority: 10
+    prefix: "[Work] "
+    file: tests/fixtures/outlook.ics
+
+  - id: notion
+    kind: ics
+    priority: 50
+    file: tests/fixtures/notion_export.ics
+
+sinks:
+  - kind: ics_file
+    path: out/test_unified.ics
+    calendar_name: Key - Unified
+    refresh_interval: PT15M

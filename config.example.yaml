@@ -1,0 +1,121 @@
+# calhub configuration
+#
+# Copy to config.yaml and fill in. config.yaml is git-ignored.
+# Never put a token or password directly in this file: write ${ENV_VAR} instead
+# and set the variable in your shell or as a GitHub Actions secret.
+
+timezone: Asia/Seoul
+back_days: 14          # keep this much recent history in the unified calendar
+forward_days: 120      # and this much of the future
+dedupe: true           # collapse the same meeting arriving from two sources
+
+# Entries shorter than this are reminders, not commitments. 0 disables the filter.
+drop_shorter_than_minutes: 0
+
+# --- safety valves -----------------------------------------------------------
+# Refuse to publish a merge when a source failed, so a broken Outlook link cannot
+# silently erase work meetings from the unified calendar.
+allow_partial: false
+# Refuse a run that would delete more than this share of the target calendar.
+max_delete_ratio: 0.5
+delete_guard_min_events: 10
+
+
+sources:
+  # ---------------------------------------------------------------------------
+  # 1. Microsoft 365 / Teams  -- via a published ICS link.
+  #
+  # This route needs NO Azure app registration and NO administrator consent, which
+  # is why it is the default here. In Outlook on the web:
+  #   Settings -> Calendar -> Shared calendars -> Publish a calendar
+  #   -> pick the calendar -> "Can view all details" -> Publish -> copy the ICS link
+  #
+  # If your tenant has disabled publishing, see docs/SETUP-ko.md for the fallbacks.
+  # ---------------------------------------------------------------------------
+  - id: outlook
+    kind: ics
+    priority: 10          # lower number wins a duplicate; work calendar is truth
+    url: ${OUTLOOK_ICS_URL}
+    prefix: "[Work] "
+    skip_declined: true
+    # privacy: busy       # uncomment to mirror only the time, never the subject
+
+  # ---------------------------------------------------------------------------
+  # 2. Notion -- via the API (richer than Notion's own ICS export).
+  #    Create an integration at notion.so/my-integrations, then open the database
+  #    and use ... -> Connections -> add that integration.
+  # ---------------------------------------------------------------------------
+  - id: notion
+    kind: notion
+    priority: 50
+    token: ${NOTION_TOKEN}
+    database_id: ${NOTION_DATABASE_ID}
+    date_property: Date            # the date column, spelled exactly as in Notion
+    # title_property: Name         # omit to auto-detect the title column
+    # location_property: Location
+    # description_properties: [Status, Owner, Opportunity]
+    prefix: "[Notion] "
+
+  # Alternative: Notion without the API, using a view's ICS link.
+  # - id: notion
+  #   kind: ics
+  #   priority: 50
+  #   url: ${NOTION_ICS_URL}
+
+  # ---------------------------------------------------------------------------
+  # 3. Google Calendar (read side)
+  # ---------------------------------------------------------------------------
+  - id: gcal-personal
+    kind: google
+    priority: 30
+    calendar_id: ${GOOGLE_SOURCE_CALENDAR_ID}
+    service_account_json: ${GOOGLE_SERVICE_ACCOUNT_JSON}
+    skip_declined: true
+
+  # ---------------------------------------------------------------------------
+  # 4. iCloud -- CalDAV. Requires an app-specific password from appleid.apple.com,
+  #    not your Apple ID password.
+  # ---------------------------------------------------------------------------
+  - id: icloud
+    kind: caldav
+    priority: 40
+    enabled: false                 # turn on once the app-specific password is set
+    url: https://caldav.icloud.com/
+    username: ${ICLOUD_USERNAME}
+    password: ${ICLOUD_APP_PASSWORD}
+    # calendars: ["Home", "Family"]   # omit to read every calendar
+
+
+sinks:
+  # ---------------------------------------------------------------------------
+  # A. A single merged .ics file.
+  #    Host it (GitHub Pages works and is free) and subscribe on the iPhone:
+  #    Settings -> Calendar -> Accounts -> Add Account -> Other
+  #      -> Add Subscribed Calendar -> paste the URL
+  #    No Apple Developer account and no App Store review involved.
+  # ---------------------------------------------------------------------------
+  - kind: ics_file
+    # PUBLISH_SLUG is a long random string (openssl rand -hex 16). An .ics
+    # subscription URL cannot be authenticated -- the phone fetches it anonymously --
+    # so an unguessable path is the only thing protecting it. Pair it with
+    # `privacy: busy` on the work source before publishing anywhere public.
+    path: public/${PUBLISH_SLUG}/unified.ics
+    calendar_name: "Key - Unified"
+    refresh_interval: PT15M        # hint to iOS for how often to re-fetch
+
+  # ---------------------------------------------------------------------------
+  # B. Mirror into a dedicated Google calendar.
+  #    Create an EMPTY calendar for this. Events written here carry a private
+  #    marker; anything you add by hand is never touched. Still, a calendar used
+  #    only as a mirror keeps the blast radius at zero.
+  # ---------------------------------------------------------------------------
+  - kind: google
+    enabled: false
+    calendar_id: ${GOOGLE_TARGET_CALENDAR_ID}
+    service_account_json: ${GOOGLE_SERVICE_ACCOUNT_JSON}
+    # Google colour ids are '1'..'11'.
+    source_colors:
+      outlook: "11"
+      notion: "5"
+      gcal-personal: "7"
+      icloud: "10"
