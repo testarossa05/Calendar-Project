@@ -97,7 +97,25 @@ sources:
     skip_declined: true
 
   # ---------------------------------------------------------------------------
-  # 4. iCloud -- CalDAV. Requires an app-specific password from appleid.apple.com,
+  # 4. Anniversaries, birthdays and day-count milestones from a local file.
+  #
+  #    This covers calendars that cannot be exported at all. Between (비트윈) has
+  #    a shared calendar and anniversary tracker but publishes no ICS feed, no
+  #    API and no external sync, so its entries cannot be pulled out by any
+  #    supported means. Declare the dates that matter in events.yaml instead.
+  #
+  #    For couple schedules that change often, a Google calendar shared with your
+  #    partner is the better answer: add it as another 'google' source above and
+  #    both of you can edit it. See docs/SETUP-ko.md section 2.5.
+  # ---------------------------------------------------------------------------
+  - id: family
+    kind: local
+    priority: 20
+    file: events.yaml           # copy events.example.yaml -> events.yaml
+    prefix: "[가족] "
+
+  # ---------------------------------------------------------------------------
+  # 5. iCloud -- CalDAV. Requires an app-specific password from appleid.apple.com,
   #    not your Apple ID password.
   # ---------------------------------------------------------------------------
   - id: icloud
@@ -142,4 +160,5 @@ sinks:
       outlook: "11"
       notion: "5"
       gcal-personal: "7"
+      family: "4"
       icloud: "10"

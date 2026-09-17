@@ -244,6 +244,95 @@ export ICLOUD_APP_PASSWORD='xxxx-xxxx-xxxx-xxxx'
 
 ---
 
+### 2.5 비트윈(Between) 및 폐쇄형 앱의 일정
+
+**결론: 비트윈은 연동할 수 없다.** 공식 사이트 확인 결과 공유 캘린더와 기념일
+기능은 있으나, **데이터 내보내기·ICS 피드·공개 API·외부 캘린더 동기화가 모두
+제공되지 않는다.** (2026-09 기준, [between.us](https://between.us/) 확인)
+
+비트윈은 2011년 VCNC가 출시했고, 2021년 크래프톤, 2025년 2월 딜라이트룸 자회사
+DLT파트너스로 운영사가 두 차례 바뀌었다. 서비스는 계속 운영 중이다.
+
+공개된 인터페이스가 없는 서비스를 긁어 오는 것은 약관 위반 소지가 있고, 앱이
+바뀌면 즉시 깨진다. 따라서 이 프로젝트는 그 방향을 택하지 않는다. 대신 두 가지를
+제안한다.
+
+#### 권장 — 배우자와 공유하는 Google 캘린더
+
+자주 바뀌는 커플·가족 일정에는 이쪽이 맞다.
+
+1. Google 캘린더 웹 → 새 캘린더 생성 (예: "가족")
+2. 해당 캘린더 설정 → **특정 사용자와 공유** → 배우자 계정 추가 →
+   권한 **"일정 변경"**
+3. 배우자 휴대폰에서도 Google 캘린더로 편집 가능
+4. calhub에는 `google` 소스를 하나 더 추가하면 끝
+
+```yaml
+- id: family-shared
+  kind: google
+  priority: 20
+  calendar_id: ${GOOGLE_FAMILY_CALENDAR_ID}
+  service_account_json: ${GOOGLE_SERVICE_ACCOUNT_JSON}
+  prefix: "[가족] "
+```
+
+양방향으로 동작하고, 알림이 두 사람 모두에게 가며, 이 도구가 그대로 읽는다.
+
+**추가 고려사항**: 2025년 9월 13일 비트윈에서 서버 점검 중 코드값 오지정으로
+사진·프로필 이미지가 대량 삭제되는 사고가 있었고, 운영사는 복구 불가를 공지했다
+([한국경제](https://www.hankyung.com/article/2025092951317)). 일정을 한 곳에만
+두는 구조 자체가 위험하다는 점도 참고할 만하다.
+
+#### 대안 — 기념일과 D-day는 로컬 파일로
+
+결혼기념일, 생일, "만난 지 1000일" 같은 항목은 자주 바뀌지 않는다. 이런 날짜는
+파일에 한 번 적어 두면 매년 자동으로 펼쳐진다.
+
+```bash
+cp events.example.yaml events.yaml    # events.yaml은 git-ignored
+```
+
+```yaml
+events:
+  - title: 결혼기념일
+    date: 2019-05-20
+    annual: true
+    anniversary_label: "{n}주년"        # -> "결혼기념일 (7주년)"
+
+  - title: 예나 생일
+    date: 2024-02-14
+    annual: true
+    anniversary_label: "{n}살"          # 카운트가 곧 나이
+
+  - title: 우리
+    date: 2015-03-01
+    day_milestones: [1000, 2000, 3000, 4000, 5000]
+    milestone_label: "만난 지 {n}일"     # 시작일이 1일째
+
+  - title: 어린이집 상담
+    date: 2026-10-15
+    start: "14:00"
+    end: "15:00"
+```
+
+```yaml
+# config.yaml
+- id: family
+  kind: local
+  priority: 20
+  file: events.yaml
+  prefix: "[가족] "
+```
+
+| 항목 | 동작 |
+|---|---|
+| `annual: true` | 매년 반복. 창(window)에 걸리는 연도만 생성 |
+| `anniversary_label` | `{n}` = 기준일로부터 경과 연수. 생일이면 곧 나이 |
+| `day_milestones` | 기준일로부터 N일째. **시작일이 1일째**로 계산 |
+| 2월 29일 | 평년에는 2월 28일로 자동 보정 |
+| `start`/`end` 생략 | 종일 일정 |
+| 자정을 넘는 시각 | 다음 날로 자동 연장 |
+
 ## 3. 아이폰 연결
 
 ### 방법 A — Google 전용 캘린더 (권장: 비공개 유지)
@@ -315,6 +404,7 @@ launchd는 macOS가 지원하는 정식 스케줄러다. cron도 동작하지만
 | Secret | 필수 | 설명 |
 |---|---|---|
 | `PUBLISH_SLUG` | ics_file 사용 시 | 추측 불가능한 URL 경로 |
+| `GOOGLE_FAMILY_CALENDAR_ID` | 공유 캘린더 사용 시 | 배우자와 공유한 캘린더 ID |
 | `MS_CLIENT_ID` / `MS_TENANT_ID` | msgraph 사용 시 | Entra 앱 등록 정보 |
 | `MS_TOKEN_CACHE` | msgraph 사용 시 | `ms-auth`가 만든 캐시 파일 **내용** |
 | `OUTLOOK_ICS_URL` | ics 사용 시 | Outlook 게시 ICS 링크 |
@@ -347,6 +437,8 @@ launchd는 macOS가 지원하는 정식 스케줄러다. cron도 동작하지만
 | EventKit이 캘린더 0개 | macOS 캘린더 접근 권한 미승인. 시스템 설정 → 개인정보 보호 및 보안 → 캘린더 |
 | launchd 작업이 안 돌아감 | `launchctl print gui/$(id -u)/com.calhub.sync`로 상태 확인, `~/Library/Logs/calhub/sync.err.log` 확인 |
 | Mac이 잠든 동안 갱신 안 됨 | 정상 동작. 기존 일정은 유지되며 새 변경만 지연됨 |
+| 비트윈 일정이 안 들어옴 | 비트윈은 내보내기·API를 제공하지 않는다. 2.5절 참조 |
+| 기념일이 하루 밀림 | `timezone`이 `Asia/Seoul`인지 확인 |
 | `source(s) failed: ... 이전 버전을 유지` | 의도된 동작. 소스를 고치거나 `--force` |
 | `max_delete_ratio` 초과로 중단 | 소스가 대량 누락됐을 가능성. `sync -n`으로 확인 후 `--force` |
 | 아이폰에 반영이 느림 | iOS 구독 캘린더 새로고침 주기 제한. 방법 A(Google)가 더 빠름 |

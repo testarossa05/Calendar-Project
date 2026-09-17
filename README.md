@@ -73,6 +73,7 @@ python -m calhub sync         # 실제 동기화
 | `ics` | 게시된 ICS, Notion, iCloud 공유 등 | 없음 (URL만) | 캘린더 게시 허용 |
 | `notion` | Notion 데이터베이스 | Integration Token | 해당 없음 |
 | `google` | Google Calendar | 서비스 계정 또는 OAuth | 해당 없음 |
+| `local` | 기념일·생일·D-day (파일 선언) | 없음 | 해당 없음 |
 | `caldav` | iCloud, 기타 CalDAV | 앱 전용 암호 | 해당 없음 |
 
 ### 회사 M365 접근 경로
@@ -91,6 +92,19 @@ python -m calhub sync         # 실제 동기화
 어느 경로도 접근 통제를 우회하지 않는다. 모두 본인에게 이미 허가된 데이터를
 본인이 접근하는 방식이다. 자세한 설정과 오류별 판별법은
 [docs/SETUP-ko.md](docs/SETUP-ko.md) 참조.
+
+### 비트윈 같은 폐쇄형 앱
+
+비트윈(Between)은 공유 캘린더와 기념일 기능이 있으나 **내보내기·ICS·API·외부 동기화를
+제공하지 않는다**(2026-09 확인). 공개 인터페이스가 없는 서비스를 긁어 오는 방식은
+약관 위반 소지가 있고 앱 변경 시 바로 깨지므로 채택하지 않았다. 대신:
+
+- **자주 바뀌는 커플·가족 일정** → 배우자와 공유하는 Google 캘린더를 `google`
+  소스로 추가. 양방향 편집이 되고 알림도 양쪽에 간다.
+- **기념일·생일·D-day** → `local` 소스. `events.yaml`에 한 번 적으면 매년 자동
+  전개된다. `"결혼기념일 (7주년)"`, `"만난 지 4000일"` 같은 라벨을 만들어 준다.
+
+자세한 내용은 [docs/SETUP-ko.md](docs/SETUP-ko.md) 2.5절.
 
 ## 싱크(Sink)
 

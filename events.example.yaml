@@ -1,0 +1,41 @@
+# Anniversaries, birthdays and day-count milestones.
+#
+# Written for calendars that live inside a closed app. Between (비트윈), for
+# example, has a shared calendar and anniversary tracker but publishes no ICS
+# feed, no API and no external sync, so its entries cannot be pulled out. Declare
+# the dates that matter here instead and they join the unified calendar.
+#
+# Copy to events.yaml (git-ignored) and edit.
+
+events:
+  # A yearly anniversary with a running count.
+  # 2019 + 7 -> "결혼기념일 (7주년)" in 2026.
+  - title: 결혼기념일
+    date: 2019-05-20
+    annual: true
+    anniversary_label: "{n}주년"
+
+  # A birthday. The count is the age, so the birth year itself renders as 0.
+  - title: 예나 생일
+    date: 2024-02-14
+    annual: true
+    anniversary_label: "{n}살"
+
+  # Day-count milestones from a start date. Day 1 is the start date itself,
+  # which is how these apps count.
+  - title: 우리
+    date: 2015-03-01
+    day_milestones: [1000, 2000, 3000, 4000, 5000, 6000]
+    milestone_label: "만난 지 {n}일"
+
+  # A plain one-off entry. Omit start/end for an all-day event.
+  - title: 어린이집 상담
+    date: 2026-10-15
+    start: "14:00"
+    end: "15:00"
+    location: 직장 어린이집
+
+  # An all-day one-off.
+  - title: 가족 여행
+    date: 2026-11-07
+    description: 2박 3일
