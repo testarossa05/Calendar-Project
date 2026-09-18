@@ -11,6 +11,7 @@
 각 단계의 **통과 기준**을 충족하지 못하면 다음 단계로 넘어가지 말 것.
 
 ```
+사전   터미널·git·Python 점검        ~5분
 0단계  설치            자격증명 0개   ~10분
 1단계  local 소스      자격증명 0개   ~15분   ← 파이프라인 전체를 여기서 검증
 2단계  ICS 파일 확인   자격증명 0개   ~5분
@@ -23,6 +24,76 @@
 ```
 
 5단계까지만 끝내도 실사용이 시작된다. 6단계 이후는 여유 있을 때 하나씩 붙이면 된다.
+
+---
+
+## 시작하기 전에 — 터미널과 사전 점검
+
+### 터미널 여는 법
+
+`⌘ + Space` → `터미널` 입력 → `Enter`.
+(응용 프로그램 → 유틸리티 → 터미널 에도 있다.)
+
+명령은 **한 줄씩 붙여넣고 Enter**를 누른다. 여러 줄을 한꺼번에 붙여도 동작하지만,
+처음에는 한 줄씩 결과를 보면서 진행하는 편이 낫다.
+
+### 어디에 설치할지 정한다
+
+`git clone`은 **현재 위치에** `Calendar-Project` 폴더를 만든다. 터미널을 새로 열면
+홈 디렉터리에서 시작하므로, 별도로 옮기지 않으면 `~/Calendar-Project`가 된다.
+문서 폴더에 두고 싶다면 먼저 이동한다.
+
+```bash
+cd ~/Documents
+```
+
+지금 어디 있는지는 `pwd`로 확인한다.
+
+### 사전 점검 (이것부터 실행)
+
+아래를 통째로 붙여넣는다.
+
+```bash
+echo "=== 사전 점검 ==="
+for c in git python3 brew; do
+  if command -v "$c" >/dev/null 2>&1; then
+    printf '%-9s: %s\n' "$c" "$("$c" --version 2>&1 | head -1)"
+  else
+    printf '%-9s: 없음\n' "$c"
+  fi
+done
+python3 -c 'import sys; v=sys.version_info; print("판정     : Python %d.%d %s" % (v[0], v[1], "OK" if v>=(3,11) else "-> 3.11 이상 필요"))' 2>/dev/null
+```
+
+기대 출력:
+
+```
+=== 사전 점검 ===
+git      : git version 2.39.5 (Apple Git-154)
+python3  : Python 3.12.7
+brew     : Homebrew 4.x.x
+판정     : Python 3.12 OK
+```
+
+| 결과 | 조치 |
+|---|---|
+| `git : 없음` | `git --version`을 한 번 실행하면 macOS가 명령어 도구 설치를 제안한다. 설치 후 재점검 |
+| `python3 : 없음` 또는 `3.11 이상 필요` | Homebrew가 있으면 `brew install python@3.12`. 없으면 아래 참조 |
+| `brew : 없음` | Python이 3.11 이상이면 **문제없다.** Homebrew는 Python을 새로 깔 때만 필요 |
+
+Homebrew가 없고 Python도 낮다면, [python.org/downloads](https://www.python.org/downloads/macos/)에서
+macOS용 설치 파일을 받아 설치하는 쪽이 가장 간단하다. 설치 후 터미널을 새로 열고
+사전 점검을 다시 실행한다.
+
+### 알아둘 점
+
+- `./scripts/install-macos.sh`는 **몇 분 걸린다.** 의존성을 내려받기 때문이며,
+  특히 EventKit 바인딩(PyObjC)이 크다. 진행이 없어 보여도 기다린다.
+- 설치 중 무언가 물어보는 일은 없다. 비밀번호를 요구하면 잘못된 명령이다.
+- 이 저장소는 **공개(public)** 상태다. 코드는 공개돼도 무방하지만
+  `config.yaml`과 `events.yaml`은 절대 커밋하지 말 것. 두 파일은 `.gitignore`에
+  들어 있어 실수로 올라가지 않는다. 개인용으로만 쓸 것이라면 GitHub에서
+  저장소를 Private으로 바꿔 두는 편이 안전하다.
 
 ---
 
@@ -303,6 +374,7 @@ Google 캘린더 웹에서 일정이 지워지지 않았는지 직접 확인한�
 ## 요약 체크리스트
 
 ```
+[ ] -  사전 점검: git 있음, Python 3.11 이상
 [ ] 0  calhub --version / doctor --no-probe / pytest 통과
 [ ] 1  agenda에서 기념일·D-day 날짜가 달력과 일치
 [ ] 2  out/unified.ics가 Mac 캘린더 앱에서 정상 표시
