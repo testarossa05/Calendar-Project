@@ -110,3 +110,69 @@ def test_check_renders_remedy_only_for_problems():
     bad = doctor.Check("x", "fail", "broken", "do something")
     assert "do something" not in ok.render()
     assert "do something" in bad.render()
+
+
+class TestSinkChecks:
+    """A misconfigured sink is invisible to the source probe.
+
+    Pasting a source block under `sinks:` is an easy mistake -- the two lists sit
+    next to each other in the config -- and it used to pass every check, leaving
+    the failure to surface much later at `sync`.
+    """
+
+    def _config(self, sink_kind, **options):
+        from calhub.config import Config, SinkConfig, SourceConfig
+
+        return Config(
+            sources=[SourceConfig(id="family", kind="local", options={"file": "x.yaml"})],
+            sinks=[SinkConfig(kind=sink_kind, options=options)],
+        )
+
+    def test_source_kind_used_as_a_sink_says_where_the_block_belongs(self):
+        checks = doctor.check_sinks(self._config("eventkit"))
+        assert checks[0].status == "fail"
+        assert "is a SOURCE, not a sink" in checks[0].remedy
+        assert "sources:" in checks[0].remedy
+
+    def test_unknown_kind_lists_the_valid_ones(self):
+        checks = doctor.check_sinks(self._config("carrier-pigeon"))
+        assert checks[0].status == "fail"
+        assert "ics_file" in checks[0].detail
+
+    def test_valid_sink_passes(self, tmp_path):
+        checks = doctor.check_sinks(self._config("ics_file", path=str(tmp_path / "u.ics")))
+        assert checks[0].status == "ok"
+
+    def test_missing_required_option_is_reported(self):
+        checks = doctor.check_sinks(self._config("google"))
+        assert checks[0].status == "fail"
+        assert "calendar_id" in checks[0].detail
+
+    def test_disabled_sink_is_skipped_not_validated(self):
+        from calhub.config import Config, SinkConfig, SourceConfig
+
+        config = Config(
+            sources=[SourceConfig(id="f", kind="local", options={"file": "x"})],
+            sinks=[SinkConfig(kind="google", enabled=False, options={})],
+        )
+        checks = doctor.check_sinks(config)
+        assert checks[0].status == "skip"
+
+    def test_run_reports_a_bad_sink_as_a_problem(self, tmp_path, capsys):
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(
+            "sources:\n"
+            "  - id: family\n"
+            "    kind: local\n"
+            f"    file: {tmp_path / 'events.yaml'}\n"
+            "sinks:\n"
+            "  - kind: ics_file\n"
+            f"    path: {tmp_path / 'u.ics'}\n"
+            "  - id: outlook-mac\n"
+            "    kind: eventkit\n",
+            encoding="utf-8",
+        )
+        (tmp_path / "events.yaml").write_text("events: []\n", encoding="utf-8")
+        code = doctor.run(str(config_file))
+        assert code == 2
+        assert "is a SOURCE, not a sink" in capsys.readouterr().out

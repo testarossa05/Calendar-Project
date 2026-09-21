@@ -202,7 +202,16 @@ open out/unified.ics
 
 Mac의 Outlook/캘린더 앱에 회사 계정이 연결되어 있어야 한다.
 
-`config.yaml`의 `sources:` 아래에 추가한다. 들여쓰기(공백 2칸 + `- `)를 정확히 맞출 것.
+`config.yaml`의 **`sources:` 아래에** 추가한다. `sinks:` 아래가 아니다 — 두 목록이
+파일에서 나란히 있어 섞이기 쉽다. 들여쓰기(공백 2칸 + `- `)도 정확히 맞출 것.
+
+붙여넣은 뒤 위치를 확인하려면:
+
+```bash
+grep -n 'sources:\|sinks:\|- id:\|- kind:' config.yaml
+```
+
+`- id: outlook-mac` 줄이 `sources:` 와 `sinks:` **사이**에 있어야 한다.
 
 ```yaml
   - id: outlook-mac

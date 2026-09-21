@@ -124,6 +124,43 @@ def check_config(path: str) -> tuple[Check, Optional[object]]:
     return Check("Config", "ok", detail), config
 
 
+def check_sinks(config) -> list[Check]:
+    """Construct every enabled sink without contacting anything.
+
+    This catches a sink whose kind is unknown -- most often a source block pasted
+    under ``sinks:`` by mistake -- and one missing a required option. Neither
+    shows up in the source probe, so without this the run looks healthy right up
+    until ``sync`` fails.
+    """
+    from .sinks.registry import build_sink
+
+    checks = []
+    for cfg in config.sinks:
+        label = f"sink '{cfg.kind}'"
+        if not cfg.enabled:
+            checks.append(Check(label, "skip", "disabled"))
+            continue
+        try:
+            build_sink(cfg, config)
+        except ValueError as exc:
+            message = str(exc)
+            remedy = "See config.example.yaml for this sink's options."
+            if "unknown sink kind" in message:
+                from .sources.registry import SOURCE_TYPES
+
+                if cfg.kind in SOURCE_TYPES:
+                    remedy = (
+                        f"{cfg.kind!r} is a SOURCE, not a sink. This block belongs "
+                        "under 'sources:', not 'sinks:'."
+                    )
+            checks.append(Check(label, "fail", message.split("\n")[0], remedy))
+        except Exception as exc:
+            checks.append(Check(label, "fail", str(exc).split("\n")[0], "Check this sink's options."))
+        else:
+            checks.append(Check(label, "ok", "configured"))
+    return checks
+
+
 def check_sources(config) -> list[Check]:
     """Actually reach every source, because that is where the real failures are."""
     from .sync import collect
@@ -183,15 +220,23 @@ def run(config_path: str, probe_sources: bool = True) -> int:
     config_check, config = check_config(config_path)
     print(config_check.render())
 
+    sink_checks: list[Check] = []
     source_checks: list[Check] = []
+    if config is not None:
+        print("\nSinks:")
+        sink_checks = check_sinks(config)
+        for check in sink_checks:
+            print(check.render())
+
     if config is not None and probe_sources:
         print("\nSources:")
         source_checks = check_sources(config)
         for check in source_checks:
             print(check.render())
 
-    failures = [c for c in env_checks + [config_check] + source_checks if c.status == "fail"]
-    warnings = [c for c in env_checks + source_checks if c.status == "warn"]
+    everything = env_checks + [config_check] + sink_checks + source_checks
+    failures = [c for c in everything if c.status == "fail"]
+    warnings = [c for c in everything if c.status == "warn"]
 
     print()
     if failures:
