@@ -26,12 +26,18 @@ class ConfigError(Exception):
     """Raised for a malformed or incomplete configuration."""
 
 
-def _resolve(value: Any, path: str) -> Any:
-    """Recursively expand ``${VAR}`` references against the environment."""
+def _resolve(value: Any, path: str, strict: bool = True) -> Any:
+    """Recursively expand ``${VAR}`` references against the environment.
+
+    With ``strict=False`` an unset variable is left as written instead of raising.
+    That is what makes a disabled source or sink free: its credentials are never
+    read, so demanding them would force the block to be deleted rather than simply
+    switched off.
+    """
     if isinstance(value, dict):
-        return {k: _resolve(v, f"{path}.{k}") for k, v in value.items()}
+        return {k: _resolve(v, f"{path}.{k}", strict) for k, v in value.items()}
     if isinstance(value, list):
-        return [_resolve(v, f"{path}[{i}]") for i, v in enumerate(value)]
+        return [_resolve(v, f"{path}[{i}]", strict) for i, v in enumerate(value)]
     if isinstance(value, str):
         match = _ENV_WHOLE.match(value.strip())
         if match:
@@ -40,6 +46,8 @@ def _resolve(value: Any, path: str) -> Any:
             if found is None or found == "":
                 if default is not None:
                     return default
+                if not strict:
+                    return value
                 raise ConfigError(
                     f"{path}: environment variable {name!r} is referenced but not set"
                 )
@@ -50,6 +58,8 @@ def _resolve(value: Any, path: str) -> Any:
                 name = m.group(1)
                 found = os.environ.get(name)
                 if found is None or found == "":
+                    if not strict:
+                        return m.group(0)
                     raise ConfigError(
                         f"{path}: environment variable {name!r} is referenced but not set"
                     )
@@ -127,7 +137,14 @@ def load_config(path: str | Path) -> Config:
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(raw, dict):
         raise ConfigError(f"{path}: top level must be a mapping")
-    raw = _resolve(raw, "config")
+    # Sources and sinks are resolved one at a time below, so that a disabled entry
+    # never demands credentials it will not use.
+    top_level = {k: v for k, v in raw.items() if k not in ("sources", "sinks")}
+    raw = {
+        **_resolve(top_level, "config"),
+        "sources": raw.get("sources"),
+        "sinks": raw.get("sinks"),
+    }
 
     sources_raw = raw.get("sources") or []
     if not isinstance(sources_raw, list):
@@ -138,7 +155,8 @@ def load_config(path: str | Path) -> Config:
     for i, item in enumerate(sources_raw):
         if not isinstance(item, dict):
             raise ConfigError(f"config.sources[{i}] must be a mapping")
-        entry = dict(item)
+        enabled = bool(item.get("enabled", True))
+        entry = _resolve(dict(item), f"config.sources[{i}]", strict=enabled)
         for required in ("id", "kind"):
             if not entry.get(required):
                 raise ConfigError(f"config.sources[{i}]: missing required key {required!r}")
@@ -152,7 +170,7 @@ def load_config(path: str | Path) -> Config:
             SourceConfig(
                 id=sid,
                 kind=str(entry["kind"]),
-                enabled=bool(entry.get("enabled", True)),
+                enabled=enabled,
                 priority=int(entry.get("priority", 100)),
                 privacy=str(entry.get("privacy", "full")),
                 busy_title=str(entry.get("busy_title", "• Busy")),
@@ -168,14 +186,15 @@ def load_config(path: str | Path) -> Config:
     for i, item in enumerate(sinks_raw):
         if not isinstance(item, dict):
             raise ConfigError(f"config.sinks[{i}] must be a mapping")
-        entry = dict(item)
+        sink_enabled = bool(item.get("enabled", True))
+        entry = _resolve(dict(item), f"config.sinks[{i}]", strict=sink_enabled)
         if not entry.get("kind"):
             raise ConfigError(f"config.sinks[{i}]: missing required key 'kind'")
         options = {k: v for k, v in entry.items() if k not in {"kind", "enabled"}}
         sinks.append(
             SinkConfig(
                 kind=str(entry["kind"]),
-                enabled=bool(entry.get("enabled", True)),
+                enabled=sink_enabled,
                 options=options,
             )
         )

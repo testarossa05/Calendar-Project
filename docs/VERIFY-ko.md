@@ -136,8 +136,11 @@ cp events.example.yaml events.yaml
 cp config.example.yaml config.yaml
 ```
 
-`events.yaml`을 본인 날짜로 수정한다. `config.yaml`에서는 **`family` 소스 하나만
-남기고 나머지 소스를 전부 `enabled: false`** 로 바꾼다. sink는 `ics_file`만 켠다.
+`events.yaml`을 본인 날짜로 수정한다.
+
+`config.yaml`은 **그대로 두면 된다.** 복사된 상태에서 이미 `family` 소스 하나만
+켜져 있고 나머지는 `enabled: false`다. 자격증명이 필요한 소스는 6단계에서 하나씩
+켠다.
 
 ```yaml
 sources:
@@ -152,8 +155,6 @@ sinks:
     path: out/unified.ics
     calendar_name: "Key - Unified"
 ```
-
-> `path`에서 `${PUBLISH_SLUG}` 부분은 지운다. 로컬 확인 단계에서는 필요 없다.
 
 ```bash
 calhub doctor                # 소스 접속까지 포함

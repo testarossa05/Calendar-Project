@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from calhub.config import ConfigError, load_config
@@ -126,3 +128,78 @@ def test_multiple_inline_refs_in_one_value(tmp_path, monkeypatch):
     text = BASE.replace("    path: out/u.ics", "    path: ${A}/mid/${B}.ics")
     cfg = load_config(write(tmp_path, text))
     assert cfg.active_sinks[0].options["path"] == "x/mid/y.ics"
+
+
+class TestDisabledEntriesAreFree:
+    """A disabled source must not demand the credentials it will never use.
+
+    The runbook tells the reader to switch sources off while bringing them up one
+    at a time, so requiring their environment variables anyway would force them to
+    delete the blocks instead.
+    """
+
+    DISABLED = """
+sources:
+  - id: work
+    kind: msgraph
+    enabled: false
+    client_id: ${ABSENT_CLIENT_ID}
+  - id: family
+    kind: local
+    file: events.yaml
+sinks:
+  - kind: ics_file
+    path: out/u.ics
+"""
+
+    def test_disabled_source_ignores_unset_variables(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("ABSENT_CLIENT_ID", raising=False)
+        cfg = load_config(write(tmp_path, self.DISABLED))
+        assert [s.id for s in cfg.active_sources] == ["family"]
+
+    def test_enabled_source_still_requires_them(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("ABSENT_CLIENT_ID", raising=False)
+        text = self.DISABLED.replace("    enabled: false\n", "")
+        with pytest.raises(ConfigError, match="ABSENT_CLIENT_ID"):
+            load_config(write(tmp_path, text))
+
+    def test_disabled_sink_ignores_unset_variables(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("ABSENT_DB", raising=False)
+        text = self.DISABLED + """  - kind: notion
+    enabled: false
+    database_id: ${ABSENT_DB}
+    token: ${ABSENT_DB}
+"""
+        cfg = load_config(write(tmp_path, text))
+        assert [s.kind for s in cfg.active_sinks] == ["ics_file"]
+
+    def test_enabled_source_keeps_its_resolved_values(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("ABSENT_CLIENT_ID", "real-value")
+        text = self.DISABLED.replace("    enabled: false\n", "")
+        cfg = load_config(write(tmp_path, text))
+        assert cfg.sources[0].options["client_id"] == "real-value"
+
+
+def test_shipped_example_config_works_on_a_fresh_copy(tmp_path, monkeypatch):
+    """Copying config.example.yaml must produce a usable config with no setup.
+
+    install-macos.sh copies it and then runs the diagnostics, so an example that
+    needs credentials makes a correct install look broken.
+    """
+    from pathlib import Path
+
+    for name in list(os.environ):
+        if name.startswith(("MS_", "NOTION_", "GOOGLE_", "ICLOUD_", "OUTLOOK_", "PUBLISH_")):
+            monkeypatch.delenv(name, raising=False)
+
+    example = Path(__file__).parent.parent / "config.example.yaml"
+    cfg = load_config(example)
+    assert cfg.active_sources, "at least one source must work without credentials"
+    for source in cfg.active_sources:
+        assert source.kind == "local", (
+            f"source {source.id!r} is enabled by default but needs credentials"
+        )
+    assert cfg.active_sinks
+    for sink in cfg.active_sinks:
+        for value in sink.options.values():
+            assert "${" not in str(value), f"default sink still needs {value!r}"

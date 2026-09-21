@@ -37,6 +37,7 @@ sources:
   #     Set up:  python -m calhub ms-auth --client-id <id> --tenant-id <tenant>
   - id: outlook
     kind: msgraph
+    enabled: false        # <- turn on after 'calhub ms-auth' (VERIFY-ko.md step 6)
     priority: 10          # lower number wins a duplicate; work calendar is truth
     client_id: ${MS_CLIENT_ID}
     tenant_id: ${MS_TENANT_ID}
@@ -71,6 +72,7 @@ sources:
   # ---------------------------------------------------------------------------
   - id: notion
     kind: notion
+    enabled: false        # <- turn on once the integration token is set
     priority: 50
     token: ${NOTION_TOKEN}
     database_id: ${NOTION_DATABASE_ID}
@@ -91,6 +93,7 @@ sources:
   # ---------------------------------------------------------------------------
   - id: gcal-personal
     kind: google
+    enabled: false        # <- turn on once the Google credential is set
     priority: 30
     calendar_id: ${GOOGLE_SOURCE_CALENDAR_ID}
     service_account_json: ${GOOGLE_SERVICE_ACCOUNT_JSON}
@@ -108,6 +111,9 @@ sources:
   #    partner is the better answer: add it as another 'google' source above and
   #    both of you can edit it. See docs/SETUP-ko.md section 2.5.
   # ---------------------------------------------------------------------------
+  # This one is ON by default: it needs no credentials, so a freshly copied
+  # config works immediately. Everything else starts disabled -- switch each on
+  # as you set its credential up, one at a time.
   - id: family
     kind: local
     priority: 20
@@ -141,7 +147,9 @@ sinks:
     # subscription URL cannot be authenticated -- the phone fetches it anonymously --
     # so an unguessable path is the only thing protecting it. Pair it with
     # `privacy: busy` on the work source before publishing anywhere public.
-    path: public/${PUBLISH_SLUG}/unified.ics
+    # Local output by default. Only switch to public/${PUBLISH_SLUG}/unified.ics
+    # when publishing somewhere reachable from the internet -- see the warning above.
+    path: out/unified.ics
     calendar_name: "Key - Unified"
     refresh_interval: PT15M        # hint to iOS for how often to re-fetch
 
