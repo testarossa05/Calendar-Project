@@ -146,6 +146,25 @@ sinks:
     refresh_interval: PT15M        # hint to iOS for how often to re-fetch
 
   # ---------------------------------------------------------------------------
+  # C. Mirror into a Notion database.
+  #    Create one with the right schema in a single command:
+  #      calhub notion-setup --parent-page <page url or id>
+  #    Or point the *_property options at an existing database's column names.
+  #    Pages written carry a key and a content hash, so a rerun updates rather
+  #    than duplicates; a page without a key was made by hand and is left alone.
+  # ---------------------------------------------------------------------------
+  - kind: notion
+    enabled: false
+    database_id: ${NOTION_TARGET_DATABASE_ID}
+    token: ${NOTION_TOKEN}
+    # title_property: Name
+    # date_property: Date
+    # source_property: Source
+    # location_property: Location
+    # key_property: "calhub Key"
+    # hash_property: "calhub Hash"
+
+  # ---------------------------------------------------------------------------
   # B. Mirror into a dedicated Google calendar.
   #    Create an EMPTY calendar for this. Events written here carry a private
   #    marker; anything you add by hand is never touched. Still, a calendar used

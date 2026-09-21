@@ -375,6 +375,85 @@ events:
 
 ---
 
+## 3-B. Notion 데이터베이스로 동기화
+
+통합된 일정을 Notion의 별도 캘린더(데이터베이스)에 기록한다. Notion을 소스로
+읽는 것(2.2절)과는 **반대 방향**이며, 둘을 동시에 쓸 수도 있다. 다만 같은
+데이터베이스를 소스와 싱크로 동시에 지정하면 자기 자신을 되읽으므로 **반드시
+서로 다른 데이터베이스**를 쓴다.
+
+### 데이터베이스 만들기
+
+스키마를 직접 만들 필요 없이 한 명령으로 생성된다.
+
+1. Notion에서 이 데이터베이스를 둘 **부모 페이지**를 하나 만든다
+2. 그 페이지 → 우상단 `...` → **연결(Connections)** → 통합 추가
+3. 페이지 URL을 복사한 뒤:
+
+```bash
+export NOTION_TOKEN='ntn_...'
+calhub notion-setup --parent-page 'https://www.notion.so/붙여넣은-페이지-URL'
+```
+
+출력된 `database_id`를 `config.yaml`에 넣는다.
+
+```yaml
+sinks:
+  - kind: notion
+    database_id: ${NOTION_TARGET_DATABASE_ID}
+    token: ${NOTION_TOKEN}
+```
+
+생성되는 속성은 다음과 같다.
+
+| 속성 | 타입 | 용도 |
+|---|---|---|
+| Name | 제목 | 일정 제목 |
+| Date | 날짜 | 시작·종료 |
+| Source | 텍스트 | 어느 소스에서 왔는지 |
+| Location | 텍스트 | 장소 |
+| calhub Key | 텍스트 | 식별자. **수정·삭제 금지** |
+| calhub Hash | 텍스트 | 변경 감지용. **수정·삭제 금지** |
+
+뒤의 두 속성은 Notion에서 숨겨도 되지만 지우면 안 된다. 지우면 다음 실행이
+기존 항목을 찾지 못해 전부 새로 만든다.
+
+### 기존 데이터베이스를 쓰려면
+
+컬럼명이 다르면 설정에서 지정한다. 제목·날짜는 원래 쓰던 것을 쓰고, Key/Hash용
+텍스트 컬럼 두 개만 새로 추가하면 된다.
+
+```yaml
+  - kind: notion
+    database_id: ${NOTION_TARGET_DATABASE_ID}
+    token: ${NOTION_TOKEN}
+    title_property: 제목
+    date_property: 날짜
+    key_property: 동기화키
+    hash_property: 동기화해시
+    source_property: ""        # 빈 값이면 기록하지 않음
+    location_property: ""
+```
+
+스키마가 맞지 않으면 **쓰기 전에** 어느 속성이 없거나 타입이 틀린지 알려주고
+중단한다. Notion API는 모르는 속성을 조용히 무시하기 때문에, 이 검사가 없으면
+성공한 것처럼 보이면서 아무것도 기록되지 않는다.
+
+### 동작 방식
+
+| 상황 | 결과 |
+|---|---|
+| 새 일정 | 페이지 생성 |
+| 내용이 바뀜 | 기존 페이지 수정 (중복 생성 안 함) |
+| 내용이 같음 | API 호출 없음 |
+| 일정이 사라짐 | 페이지를 **휴지통으로 이동**(archive). 복구 가능 |
+| 손으로 만든 페이지 | Key가 없으므로 **건드리지 않음** |
+
+Notion API는 초당 약 3회로 제한되므로 항목이 많으면 첫 실행이 느리다.
+200건이면 1분 남짓 걸린다. 이후 실행은 바뀐 것만 쓰므로 훨씬 빠르다.
+
+---
+
 ## 4-A. 자동 실행 — Mac (EventKit 경로를 쓸 때)
 
 EventKit은 Mac에서만 동작하므로 GitHub Actions가 아니라 Mac에서 주기 실행한다.
@@ -410,6 +489,7 @@ launchd는 macOS가 지원하는 정식 스케줄러다. cron도 동작하지만
 |---|---|---|
 | `PUBLISH_SLUG` | ics_file 사용 시 | 추측 불가능한 URL 경로 |
 | `GOOGLE_FAMILY_CALENDAR_ID` | 공유 캘린더 사용 시 | 배우자와 공유한 캘린더 ID |
+| `NOTION_TARGET_DATABASE_ID` | Notion 싱크 사용 시 | 기록할 데이터베이스 ID |
 | `MS_CLIENT_ID` / `MS_TENANT_ID` | msgraph 사용 시 | Entra 앱 등록 정보 |
 | `MS_TOKEN_CACHE` | msgraph 사용 시 | `ms-auth`가 만든 캐시 파일 **내용** |
 | `OUTLOOK_ICS_URL` | ics 사용 시 | Outlook 게시 ICS 링크 |
@@ -428,6 +508,37 @@ launchd는 macOS가 지원하는 정식 스케줄러다. cron도 동작하지만
 
 ---
 
+## 4-C. 동기화 버튼 (더블클릭)
+
+자동 실행과 별개로, 지금 당장 동기화하고 싶을 때 누를 버튼을 만든다.
+
+```bash
+./scripts/install-button.sh                 # 바탕화면에 생성
+./scripts/install-button.sh ~/Applications  # 다른 위치
+```
+
+`캘린더 동기화.command` 파일이 만들어진다. 더블클릭하면:
+
+- 터미널이 열리고 동기화가 1회 실행된다
+- **성공** → 결과 요약 알림이 뜨고 창이 자동으로 닫힌다
+- **실패** → 창이 열린 채 남아 오류와 진단 명령을 보여준다
+
+Dock에 두려면 Finder에서 파일을 Dock **오른쪽 구역**(휴지통 쪽)으로 끌어다 놓는다.
+아이콘 변경은 파일 선택 → `⌘I` → 왼쪽 위 아이콘 클릭 → 이미지 붙여넣기(`⌘V`).
+
+제거는 `./scripts/install-button.sh --uninstall`.
+
+### 아이폰에서 누르고 싶다면
+
+Mac의 단축어(Shortcuts) 앱에서 **셸 스크립트 실행** 동작으로 같은 명령을 넣고,
+아이폰 단축어 앱에서 **SSH로 스크립트 실행**을 쓰면 된다. Mac의 시스템 설정 →
+일반 → 공유 → **원격 로그인**을 켜야 하고, 같은 네트워크에 있어야 한다.
+
+다만 4-A의 launchd 자동 실행이 이미 돌고 있다면 실익이 크지 않다. 버튼은
+"방금 넣은 일정을 지금 바로 반영하고 싶을 때"를 위한 것이다.
+
+---
+
 ## 5. 문제 해결
 
 | 증상 | 원인 및 조치 |
@@ -443,6 +554,10 @@ launchd는 macOS가 지원하는 정식 스케줄러다. cron도 동작하지만
 | launchd 작업이 안 돌아감 | `launchctl print gui/$(id -u)/com.calhub.sync`로 상태 확인, `~/Library/Logs/calhub/sync.err.log` 확인 |
 | Mac이 잠든 동안 갱신 안 됨 | 정상 동작. 기존 일정은 유지되며 새 변경만 지연됨 |
 | 비트윈 일정이 안 들어옴 | 비트윈은 내보내기·API를 제공하지 않는다. 2.5절 참조 |
+| Notion 싱크: 스키마 오류 | 어느 속성이 문제인지 메시지에 나온다. `notion-setup`으로 새로 만들거나 `*_property` 지정 |
+| Notion에 같은 일정이 계속 늘어남 | `calhub Key` 또는 `calhub Hash` 속성을 지웠다. 복구 후 재실행 |
+| Notion 첫 실행이 느림 | 정상. API가 초당 3회로 제한된다. 이후 실행은 빠르다 |
+| 버튼을 눌러도 아무 일 없음 | 터미널이 열리는지 확인. 안 열리면 `chmod +x` 후 재시도 |
 | 기념일이 하루 밀림 | `timezone`이 `Asia/Seoul`인지 확인 |
 | `source(s) failed: ... 이전 버전을 유지` | 의도된 동작. 소스를 고치거나 `--force` |
 | `max_delete_ratio` 초과로 중단 | 소스가 대량 누락됐을 가능성. `sync -n`으로 확인 후 `--force` |

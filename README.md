@@ -34,6 +34,7 @@ iCloud  ───────── caldav                ┘
 ```bash
 ./scripts/install-macos.sh     # 가상환경, 의존성, config.yaml, 진단까지 한 번에
 ./scripts/install-launchd.sh   # 15분 주기 자동 실행 등록
+./scripts/install-button.sh    # 바탕화면에 더블클릭 동기화 버튼
 ```
 
 **그 외**
@@ -63,6 +64,7 @@ calhub sync         # 실제 동기화
 | `google-auth <client.json>` | Google OAuth 토큰 1회 발급 |
 | `google-calendars` | 자격증명이 접근 가능한 Google 캘린더 목록 |
 | `ms-auth --client-id ...` | Microsoft Graph 1회 로그인, 토큰 캐시 저장 |
+| `notion-setup --parent-page ...` | Notion 데이터베이스를 올바른 스키마로 생성 |
 
 ## 소스(Source)
 
@@ -112,6 +114,7 @@ calhub sync         # 실제 동기화
 |---|---|---|
 | `ics_file` | 병합된 `.ics` 파일 | 설정 → 캘린더 → 계정 → 기타 → 구독 캘린더 추가 |
 | `google` | 전용 Google 캘린더에 미러링 | 아이폰에 Google 계정 추가 |
+| `notion` | Notion 데이터베이스에 미러링 | Notion 앱에서 확인 |
 
 ## 보안 및 안전장치
 

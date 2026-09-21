@@ -16,6 +16,7 @@ from datetime import datetime
 from . import __version__
 from .config import ConfigError, load_config
 from .msauth import MsAuthError
+from .sinks.base import SinkError
 from .sync import collect, run
 from .util import get_tz, parse_window
 
@@ -68,6 +69,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_cal = sub.add_parser("google-calendars", help="list Google calendars the credential can see")
     _add_common(p_cal)
+
+    p_nsetup = sub.add_parser(
+        "notion-setup",
+        help="create a Notion database with the schema the notion sink expects",
+    )
+    p_nsetup.add_argument(
+        "--parent-page", required=True, help="id of the Notion page to create it under"
+    )
+    p_nsetup.add_argument("--title", default="Unified Calendar", help="database title")
+    p_nsetup.add_argument(
+        "--token",
+        default=None,
+        help="integration token (default: the NOTION_TOKEN environment variable)",
+    )
 
     p_ms = sub.add_parser(
         "ms-auth", help="sign in to Microsoft Graph once and save a reusable token cache"
@@ -180,6 +195,43 @@ def cmd_google_calendars(args) -> int:
     return 0
 
 
+def cmd_notion_setup(args) -> int:
+    import os
+    import re
+
+    from .sinks.notion_sink import create_database
+
+    token = args.token or os.environ.get("NOTION_TOKEN")
+    if not token:
+        print(
+            "No token. Pass --token, or export NOTION_TOKEN with your integration token.",
+            file=sys.stderr,
+        )
+        return 1
+
+    # A pasted Notion URL ends in a 32-character id, often with dashes.
+    raw = args.parent_page.strip().rstrip("/").split("/")[-1].split("?")[0]
+    match = re.search(r"([0-9a-fA-F]{32}|[0-9a-fA-F-]{36})$", raw)
+    if not match:
+        print(
+            f"Could not find a page id in {args.parent_page!r}. Paste the page URL, or "
+            "the 32-character id at the end of it.",
+            file=sys.stderr,
+        )
+        return 1
+
+    result = create_database(token, match.group(1), args.title)
+    database_id = result["id"]
+    print(f"Created database: {result.get('url', '(no url)')}")
+    print(f"\nDatabase id: {database_id}")
+    print("\nAdd this to config.yaml:\n")
+    print("sinks:")
+    print("  - kind: notion")
+    print(f"    database_id: {database_id}")
+    print("    token: ${NOTION_TOKEN}")
+    return 0
+
+
 def cmd_ms_auth(args) -> int:
     from .msauth import device_code_login
 
@@ -203,9 +255,13 @@ def main(argv=None) -> int:
         "google-auth": cmd_google_auth,
         "google-calendars": cmd_google_calendars,
         "ms-auth": cmd_ms_auth,
+        "notion-setup": cmd_notion_setup,
     }
     try:
         return handlers[args.command](args)
+    except SinkError as exc:
+        print(f"Sink error: {exc}", file=sys.stderr)
+        return 1
     except MsAuthError as exc:
         print(f"Microsoft sign-in error: {exc}", file=sys.stderr)
         return 1

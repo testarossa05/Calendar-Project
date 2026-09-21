@@ -327,6 +327,42 @@ calhub sync -n
 
 ---
 
+
+### 6-B. Notion 싱크와 동기화 버튼 (선택)
+
+소스가 안정되면 Notion 데이터베이스로도 기록할 수 있다.
+
+```bash
+export NOTION_TOKEN='ntn_...'
+calhub notion-setup --parent-page '<부모 페이지 URL>'
+```
+
+출력된 id를 `config.yaml`의 notion 싱크에 넣고 `enabled: true`로 바꾼 뒤:
+
+```bash
+calhub sync -n     # 무엇을 쓸지
+calhub sync        # 실제 기록 (첫 실행은 느리다)
+calhub sync        # 두 번째는 create=0 unchanged=N 이어야 한다
+```
+
+**통과 기준**
+- Notion 데이터베이스에 일정이 보인다
+- 종일 일정의 **마지막 날짜가 하루 더 길지 않다** (Notion은 종료일 포함 방식)
+- 두 번째 실행이 `created=0`이다. 아니면 멱등성이 깨진 것이므로 멈추고 알릴 것
+
+버튼:
+
+```bash
+./scripts/install-button.sh
+```
+
+바탕화면의 `캘린더 동기화.command`를 더블클릭한다.
+
+**통과 기준**: 터미널이 열려 동기화가 돌고, 성공 시 알림이 뜬 뒤 창이 닫힌다.
+일부러 `config.yaml` 이름을 바꿔 두고 눌러 보면 창이 열린 채 오류가 보여야 한다.
+
+---
+
 ## 7단계 — 자동 실행
 
 ```bash
@@ -382,6 +418,7 @@ Google 캘린더 웹에서 일정이 지워지지 않았는지 직접 확인한�
 [ ] 4  google-calendars에서 writer 권한 확인, 2회차 sync가 unchanged
 [ ] 5  아이폰 캘린더에 Unified 표시
 [ ] 6  소스별로 하나씩 추가, 중복 제거 동작 확인
+[ ] 6B Notion 싱크 2회차가 created=0, 버튼 더블클릭 동작 (선택)
 [ ] 7  launchd 등록 후 로그 생성 확인
 [ ] 8  소스를 일부러 깨뜨렸을 때 기존 일정이 보존되는지 확인
 ```
