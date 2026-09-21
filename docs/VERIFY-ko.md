@@ -202,14 +202,18 @@ open out/unified.ics
 
 Mac의 Outlook/캘린더 앱에 회사 계정이 연결되어 있어야 한다.
 
-`config.yaml`에 추가:
+`config.yaml`의 `sources:` 아래에 추가한다. 들여쓰기(공백 2칸 + `- `)를 정확히 맞출 것.
 
 ```yaml
-  - id: outlook
+  - id: outlook-mac
     kind: eventkit
     priority: 10
     prefix: "[Work] "
 ```
+
+> id를 `outlook`이 아니라 `outlook-mac`으로 쓰는 이유: 예시 설정에 이미 비활성
+> 상태의 `outlook`(msgraph) 블록이 있다. 같은 id를 쓰면 `duplicate source id`
+> 오류가 난다. 비활성 블록도 id 중복 검사 대상이다.
 
 ```bash
 calhub doctor
@@ -235,7 +239,7 @@ calhub agenda -d 14
 외부에 공개되는 경로를 쓸 계획이면 `privacy: busy`를 넣어 시간만 남긴다.
 
 ```yaml
-  - id: outlook
+  - id: outlook-mac
     kind: eventkit
     priority: 10
     privacy: busy

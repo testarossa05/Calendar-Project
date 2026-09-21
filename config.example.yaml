@@ -28,6 +28,10 @@ sources:
   # Pick ONE of the three routes below. They are ordered by how much they need
   # from the tenant, least first. Teams meetings live in the Outlook calendar, so
   # reading that calendar is all that is required.
+  #
+  # Enable exactly one. They carry different ids so that uncommenting a second
+  # one is not a duplicate-id error, but leaving two enabled would read the same
+  # calendar twice.
   # ---------------------------------------------------------------------------
 
   # 1a. Microsoft Graph -- delegated Calendars.Read on your own mailbox.
@@ -51,7 +55,7 @@ sources:
   #     or Calendar.app client has already downloaded. Runs only on macOS, and
   #     only while the Mac is awake.
   #     Requires: pip install pyobjc-framework-EventKit
-  # - id: outlook
+  # - id: outlook-mac
   #   kind: eventkit
   #   priority: 10
   #   calendars: ["Calendar"]     # omit to read every local calendar
@@ -59,7 +63,7 @@ sources:
 
   # 1c. Published ICS link -- simplest, but blocked by policy in many tenants.
   #     Outlook web -> Settings -> Calendar -> Shared calendars -> Publish a calendar
-  # - id: outlook
+  # - id: outlook-ics
   #   kind: ics
   #   priority: 10
   #   url: ${OUTLOOK_ICS_URL}
@@ -83,7 +87,7 @@ sources:
     prefix: "[Notion] "
 
   # Alternative: Notion without the API, using a view's ICS link.
-  # - id: notion
+  # - id: notion-ics
   #   kind: ics
   #   priority: 50
   #   url: ${NOTION_ICS_URL}

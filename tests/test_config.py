@@ -203,3 +203,18 @@ def test_shipped_example_config_works_on_a_fresh_copy(tmp_path, monkeypatch):
     for sink in cfg.active_sinks:
         for value in sink.options.values():
             assert "${" not in str(value), f"default sink still needs {value!r}"
+
+
+def test_example_config_has_no_duplicate_ids_across_commented_alternatives():
+    """The commented-out alternatives must not collide with the active entries.
+
+    They are alternative routes to the same calendar, so they used to share an
+    id; uncommenting one then failed with a duplicate-id error at exactly the
+    point the runbook tells the reader to switch routes.
+    """
+    import re
+    from pathlib import Path
+
+    text = (Path(__file__).parent.parent / "config.example.yaml").read_text(encoding="utf-8")
+    ids = re.findall(r"^\s*#?\s*- id:\s*(\S+)", text, re.M)
+    assert len(ids) == len(set(ids)), f"duplicate id among example entries: {ids}"
