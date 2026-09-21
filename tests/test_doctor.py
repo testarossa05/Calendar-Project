@@ -176,3 +176,57 @@ class TestSinkChecks:
         code = doctor.run(str(config_file))
         assert code == 2
         assert "is a SOURCE, not a sink" in capsys.readouterr().out
+
+
+def test_eventkit_status_is_read_after_the_sources_are_probed(tmp_path, monkeypatch):
+    """Reading an eventkit source is what raises the macOS permission prompt.
+
+    Checking the authorization status before that happens reports "not yet
+    requested" in the very run that goes on to read the calendar successfully,
+    which reads as a contradiction.
+    """
+    order = []
+
+    monkeypatch.setattr(
+        doctor, "check_eventkit", lambda: order.append("eventkit") or doctor.Check("EventKit", "ok")
+    )
+    real_sources = doctor.check_sources
+    monkeypatch.setattr(
+        doctor, "check_sources", lambda cfg: order.append("sources") or real_sources(cfg)
+    )
+
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        "sources:\n"
+        "  - id: family\n"
+        "    kind: local\n"
+        f"    file: {tmp_path / 'events.yaml'}\n"
+        "sinks:\n"
+        "  - kind: ics_file\n"
+        f"    path: {tmp_path / 'u.ics'}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "events.yaml").write_text("events: []\n", encoding="utf-8")
+
+    doctor.run(str(config_file))
+    assert order == ["sources", "eventkit"], order
+
+
+def test_printed_sections_keep_their_order(tmp_path, capsys):
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        "sources:\n"
+        "  - id: family\n"
+        "    kind: local\n"
+        f"    file: {tmp_path / 'events.yaml'}\n"
+        "sinks:\n"
+        "  - kind: ics_file\n"
+        f"    path: {tmp_path / 'u.ics'}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "events.yaml").write_text("events: []\n", encoding="utf-8")
+
+    doctor.run(str(config_file))
+    out = capsys.readouterr().out
+    positions = [out.index(h) for h in ("Environment:", "Configuration:", "Sinks:", "Sources:")]
+    assert positions == sorted(positions), "sections must stay in reading order"

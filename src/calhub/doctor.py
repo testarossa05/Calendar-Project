@@ -201,7 +201,19 @@ def _remedy_for(error: str) -> str:
 def run(config_path: str, probe_sources: bool = True) -> int:
     print("calhub doctor\n")
 
-    print("Environment:")
+    # Everything is computed before anything is printed. The EventKit line in
+    # particular must not be evaluated first: reading an eventkit source is what
+    # raises the macOS permission prompt, so a status captured beforehand can say
+    # "not yet requested" in the same run that goes on to read the calendar.
+    config_check, config = check_config(config_path)
+
+    sink_checks: list[Check] = []
+    source_checks: list[Check] = []
+    if config is not None:
+        sink_checks = check_sinks(config)
+        if probe_sources:
+            source_checks = check_sources(config)
+
     env_checks = [check_python(), check_platform()]
     for module, package, purpose in [
         ("icalendar", "icalendar", "ICS parsing"),
@@ -213,24 +225,21 @@ def run(config_path: str, probe_sources: bool = True) -> int:
     ]:
         env_checks.append(check_module(module, package, purpose))
     env_checks.append(check_eventkit())
+
+    print("Environment:")
     for check in env_checks:
         print(check.render())
 
     print("\nConfiguration:")
-    config_check, config = check_config(config_path)
     print(config_check.render())
 
-    sink_checks: list[Check] = []
-    source_checks: list[Check] = []
-    if config is not None:
+    if sink_checks:
         print("\nSinks:")
-        sink_checks = check_sinks(config)
         for check in sink_checks:
             print(check.render())
 
-    if config is not None and probe_sources:
+    if source_checks:
         print("\nSources:")
-        source_checks = check_sources(config)
         for check in source_checks:
             print(check.render())
 
@@ -240,7 +249,7 @@ def run(config_path: str, probe_sources: bool = True) -> int:
 
     print()
     if failures:
-        print(f"{len(failures)} problem(s) found. Fix the ✗ lines above.")
+        print(f"{len(failures)} problem(s) found. Fix the \u2717 lines above.")
         return 2
     if warnings:
         print(f"Ready, with {len(warnings)} warning(s).")
