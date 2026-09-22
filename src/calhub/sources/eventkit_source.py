@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from ..models import Event, SourceRef
-from ..util import UTC, get_tz, to_utc
+from ..util import UTC, fold_name, get_tz, to_utc
 from .base import Source, SourceError
 
 # EKEntityTypeEvent
@@ -95,9 +95,10 @@ class EventKitSource(Source):
         if not wanted:
             return available
 
-        wanted_set = {str(w) for w in wanted}
-        selected = [c for c in available if str(c.title()) in wanted_set]
-        missing = wanted_set - {str(c.title()) for c in selected}
+        wanted_map = {fold_name(w): str(w) for w in wanted}
+        selected = [c for c in available if fold_name(c.title()) in wanted_map]
+        found = {fold_name(c.title()) for c in selected}
+        missing = [original for key, original in wanted_map.items() if key not in found]
         if missing:
             names = ", ".join(sorted(str(c.title()) for c in available))
             raise SourceError(

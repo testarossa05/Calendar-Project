@@ -13,7 +13,7 @@ from typing import Any, Optional
 import icalendar
 
 from ..models import Event, SourceRef
-from ..util import get_tz, is_date_only, to_utc
+from ..util import fold_name, get_tz, is_date_only, to_utc
 from .base import Source, SourceError
 
 ICLOUD_URL = "https://caldav.icloud.com/"
@@ -43,9 +43,10 @@ class CalDavSource(Source):
             ) from exc
 
         if wanted:
-            wanted_set = {str(w) for w in wanted}
-            calendars = [c for c in calendars if _display_name(c) in wanted_set]
-            missing = wanted_set - {_display_name(c) for c in calendars}
+            wanted_map = {fold_name(w): str(w) for w in wanted}
+            calendars = [c for c in calendars if fold_name(_display_name(c)) in wanted_map]
+            found = {fold_name(_display_name(c)) for c in calendars}
+            missing = [original for key, original in wanted_map.items() if key not in found]
             if missing:
                 available = ", ".join(sorted(_display_name(c) for c in principal.calendars()))
                 raise SourceError(

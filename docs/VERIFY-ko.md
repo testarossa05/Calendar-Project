@@ -231,7 +231,40 @@ calhub doctor
 첫 실행에서 macOS가 캘린더 접근 권한을 묻는다. **허용**한다.
 
 **통과 기준**: doctor의 EventKit 줄에 캘린더 목록이 보인다.
-`✓ EventKit: 3 calendar(s): Calendar, 업무, ...`
+`✓ EventKit: 5 calendar(s): 직장, 대한민국 공휴일, 생일, Calendar, 집`
+
+### 읽을 캘린더 고르기
+
+`calendars:`를 생략하면 **로컬 전체**를 읽는다. 공휴일·생일 캘린더까지 통합
+캘린더에 섞이므로, 목록을 확인한 뒤 필요한 것만 지정하는 편이 낫다.
+
+```yaml
+  - id: outlook-mac
+    kind: eventkit
+    priority: 10
+    calendars: ["직장"]
+    prefix: "[Work] "
+```
+
+캘린더명은 doctor가 출력한 것을 **그대로** 적는다. 한글 이름도 문제없다 —
+macOS가 자모 분리 형태로 돌려주더라도 내부에서 정규화해 비교한다.
+
+이름이 틀리면 사용 가능한 목록을 함께 보여준다.
+
+```
+calendar(s) not found: ['회사']. Available: 직장, 대한민국 공휴일, ...
+```
+
+공휴일은 아이폰 캘린더가 이미 표시하므로 굳이 통합할 필요가 없다. 가족 일정을
+따로 관리한다면 `집` 캘린더는 별도 소스로 분리하는 것도 방법이다.
+
+```yaml
+  - id: home-mac
+    kind: eventkit
+    priority: 25
+    calendars: ["집"]
+    prefix: "[집] "
+```
 
 ```bash
 calhub agenda -d 14

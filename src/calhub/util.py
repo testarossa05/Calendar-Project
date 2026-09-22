@@ -78,6 +78,18 @@ def normalize_title(title: str) -> str:
     return _WS.sub(" ", text).strip()
 
 
+def fold_name(name) -> str:
+    """Normalise a calendar name for comparison.
+
+    macOS hands back Unicode in either composed or decomposed form, and the two
+    are different Python strings even when they render identically. A Korean
+    calendar called 직장 can arrive decomposed while the same name typed into the
+    config is composed, which would produce a "not found" error listing the very
+    name that was asked for. Case and surrounding whitespace are folded too.
+    """
+    return unicodedata.normalize("NFC", str(name or "")).strip().casefold()
+
+
 def truncate(text: Optional[str], limit: int) -> Optional[str]:
     if text is None:
         return None
