@@ -12,7 +12,7 @@ from typing import Any, Optional
 
 import icalendar
 
-from ..models import Event, SourceRef
+from ..models import MANAGED_MARKER, Event, SourceRef
 from ..util import fold_name, get_tz, is_date_only, to_utc
 from .base import Source, SourceError
 
@@ -85,6 +85,10 @@ class CalDavSource(Source):
         for component in calendar.walk("VEVENT"):
             if str(component.get("STATUS", "")).upper() == "CANCELLED":
                 continue
+            description = _text(component.get("DESCRIPTION"))
+            if description and MANAGED_MARKER in description:
+                continue  # our own output, arriving back through a subscription
+
             dtstart = component.get("DTSTART")
             if dtstart is None:
                 continue
@@ -114,7 +118,7 @@ class CalDavSource(Source):
                     start=start,
                     end=end,
                     all_day=all_day,
-                    description=_text(component.get("DESCRIPTION")),
+                    description=description,
                     location=_text(component.get("LOCATION")),
                     status="confirmed",
                     tzid=self.option("timezone", self.app.timezone),

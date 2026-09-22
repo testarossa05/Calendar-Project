@@ -14,6 +14,12 @@ from .util import normalize_title, sha1
 # and is never touched.
 OWNER_TAG = "calhub"
 
+# Written into the description of every event this tool emits, and skipped on the
+# way back in. Without it, importing or subscribing to the unified calendar on the
+# same Mac that EventKit reads makes the tool re-ingest its own output: every sync
+# re-prefixes the events and writes them again.
+MANAGED_MARKER = "[calhub]"
+
 
 @dataclass(frozen=True)
 class SourceRef:

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import icalendar
 
-from ..models import OWNER_TAG, Event, SyncPlan
+from ..models import MANAGED_MARKER, OWNER_TAG, Event, SyncPlan
 from ..util import UTC, get_tz
 from .base import Sink, SinkError
 
@@ -100,7 +100,12 @@ def _compose_description(event: Event) -> str:
     parts = []
     if event.description:
         parts.append(event.description)
-    parts.append(f"—\nSource: {event.ref.source_id} ({event.ref.kind})")
+    # The marker lets a calendar source recognise this as our own output and skip
+    # it, so adding the unified calendar to a Mac that is also a source does not
+    # feed the tool its own events.
+    parts.append(
+        f"—\nSource: {event.ref.source_id} ({event.ref.kind}) {MANAGED_MARKER}"
+    )
     if event.url:
         parts.append(event.url)
     return "\n\n".join(parts).strip()

@@ -22,7 +22,7 @@ import icalendar
 import recurring_ical_events
 import requests
 
-from ..models import Event, SourceRef
+from ..models import MANAGED_MARKER, Event, SourceRef
 from ..util import get_tz, is_date_only, to_utc
 from .base import Source, SourceError
 
@@ -143,6 +143,10 @@ class IcsSource(Source):
         if not all_day and end <= start and min_minutes > 0:
             end = start + timedelta(minutes=min_minutes)
 
+        description = _text(component.get("DESCRIPTION"))
+        if description and MANAGED_MARKER in description:
+            return None  # our own output, arriving back through a subscription
+
         status = _STATUS_MAP.get(str(component.get("STATUS", "")).upper(), "confirmed")
         if status == "cancelled":
             return None
@@ -170,7 +174,7 @@ class IcsSource(Source):
             start=start,
             end=end,
             all_day=all_day,
-            description=_text(component.get("DESCRIPTION")),
+            description=description,
             location=_text(component.get("LOCATION")),
             url=_text(component.get("URL")),
             organizer=_mail(component.get("ORGANIZER")),

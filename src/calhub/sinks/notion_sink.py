@@ -17,7 +17,7 @@ from typing import Any, Optional
 
 import requests
 
-from ..models import OWNER_TAG, Event, SyncPlan
+from ..models import MANAGED_MARKER, OWNER_TAG, Event, SyncPlan
 from ..util import get_tz
 from .base import Sink, SinkError
 
@@ -253,8 +253,12 @@ class NotionSink(Sink):
             self.p_hash: {"rich_text": [{"text": {"content": event.content_hash()}}]},
         }
         if self.p_source:
+            # Carries the marker for the same reason the other sinks do: so this
+            # database can be read back as a source without looping.
             properties[self.p_source] = {
-                "rich_text": [{"text": {"content": _clip(event.ref.source_id, 2000)}}]
+                "rich_text": [
+                    {"text": {"content": _clip(f"{event.ref.source_id} {MANAGED_MARKER}", 2000)}}
+                ]
             }
         if self.p_location and event.location:
             properties[self.p_location] = {

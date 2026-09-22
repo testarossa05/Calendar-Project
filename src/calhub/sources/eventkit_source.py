@@ -21,7 +21,7 @@ import sys
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from ..models import Event, SourceRef
+from ..models import MANAGED_MARKER, Event, SourceRef
 from ..util import UTC, fold_name, get_tz, to_utc
 from .base import Source, SourceError
 
@@ -114,6 +114,11 @@ class EventKitSource(Source):
         except Exception:
             pass
 
+        notes = _optional_str(item.notes())
+        # Never re-ingest an event this tool wrote, however it arrived on the Mac.
+        if notes and MANAGED_MARKER in notes:
+            return None
+
         start = _from_nsdate(item.startDate())
         end = _from_nsdate(item.endDate())
         if start is None:
@@ -146,7 +151,7 @@ class EventKitSource(Source):
             start=to_utc(start, default_tz),
             end=to_utc(end, default_tz),
             all_day=all_day,
-            description=_optional_str(item.notes()),
+            description=notes,
             location=_optional_str(item.location()),
             url=_optional_str(item.URL().absoluteString() if item.URL() else None),
             status="confirmed",
