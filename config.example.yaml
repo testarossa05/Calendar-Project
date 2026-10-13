@@ -158,6 +158,25 @@ sinks:
     refresh_interval: PT15M        # hint to iOS for how often to re-fetch
 
   # ---------------------------------------------------------------------------
+  # D. Mirror into an iCloud calendar -- the shortest route to an iPhone.
+  #
+  #    Needs one app-specific password from appleid.apple.com and nothing else:
+  #    no cloud project, no service account, no public hosting. Events sync to
+  #    the phone by push and behave like any other event there.
+  #
+  #    calendar_name must be a calendar used for nothing else. It is created on
+  #    first run. Only events this tool wrote are ever changed or removed, so
+  #    anything added by hand in that calendar survives.
+  # ---------------------------------------------------------------------------
+  - kind: caldav
+    enabled: false
+    url: https://caldav.icloud.com/
+    username: ${ICLOUD_USERNAME}
+    password: ${ICLOUD_APP_PASSWORD}
+    calendar_name: "Unified"
+    # create_if_missing: false   # refuse to create it; fail instead
+
+  # ---------------------------------------------------------------------------
   # C. Mirror into a Notion database.
   #    Create one with the right schema in a single command:
   #      calhub notion-setup --parent-page <page url or id>

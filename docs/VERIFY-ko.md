@@ -16,7 +16,7 @@
 1단계  local 소스      자격증명 0개   ~15분   ← 파이프라인 전체를 여기서 검증
 2단계  ICS 파일 확인   자격증명 0개   ~5분
 3단계  EventKit        자격증명 0개   ~10분   ← 회사 일정
-4단계  Google          첫 외부 인증   ~20분
+4단계  iCloud 싱크     앱 암호 1개    ~10분
 5단계  아이폰          -              ~5분    ← 여기서 실사용 시작
 6단계  나머지 소스     소스별 인증    소스당 ~10분
 7단계  자동 실행       -              ~5분
@@ -315,7 +315,57 @@ macOS 캘린더 앱은 기본으로 **비어 있는 로컬 캘린더**를 만든
 
 ---
 
-## 4단계 — Google (첫 외부 자격증명)
+## 4단계 — 아이폰에 올리기
+
+두 경로가 있다. **iCloud가 훨씬 간단하므로 이쪽을 먼저 시도한다.**
+
+| 경로 | 준비물 | 아이폰 설정 |
+|---|---|---|
+| **iCloud (권장)** | 앱 전용 암호 1개 | 없음 (자동으로 나타남) |
+| Google | Cloud 프로젝트 + 서비스 계정 + 키 + 공유 | Google 계정 추가 |
+
+### 4-A. iCloud (권장)
+
+1. appleid.apple.com → 로그인 및 보안 → **앱 암호** → 새로 생성
+2. 생성된 `xxxx-xxxx-xxxx-xxxx`를 복사
+
+```bash
+export ICLOUD_USERNAME='본인@icloud.com'
+export ICLOUD_APP_PASSWORD='xxxx-xxxx-xxxx-xxxx'
+```
+
+`config.yaml`의 `sinks:` 아래에 추가한다.
+
+```yaml
+  - kind: caldav
+    url: https://caldav.icloud.com/
+    username: ${ICLOUD_USERNAME}
+    password: ${ICLOUD_APP_PASSWORD}
+    calendar_name: "Unified"
+```
+
+```bash
+calhub doctor
+calhub sync -n
+calhub sync
+```
+
+**통과 기준**
+- Mac 캘린더 앱에 `Unified` 캘린더가 생기고 일정이 보인다
+- 아이폰 캘린더에도 **별도 설정 없이** 나타난다 (같은 iCloud 계정)
+
+```bash
+calhub sync
+```
+
+**통과 기준 (중요)**: 두 번째 실행이 `created=0 unchanged=N`이어야 한다.
+`created`가 다시 N이면 멱등성이 깨진 것이므로 멈추고 알릴 것.
+
+**실패 시**
+- `CalDAV connection failed` → Apple ID 암호를 썼다. 앱 전용 암호로 교체
+- 캘린더 생성 실패 → 캘린더 앱에서 `Unified`를 직접 만들고 재실행
+
+### 4-B. Google (iCloud를 쓰지 않을 때만)
 
 `docs/SETUP-ko.md` 2.3절대로 서비스 계정을 만들고 JSON 키를 받는다.
 
@@ -324,40 +374,29 @@ export GOOGLE_SERVICE_ACCOUNT_JSON="$(cat ~/Downloads/서비스계정키.json)"
 calhub google-calendars
 ```
 
-**통과 기준**: 캘린더 목록과 각각의 access 권한이 출력된다.
-아무것도 안 나오면 캘린더를 서비스 계정 이메일과 공유하지 않은 것이다.
+**통과 기준**: 캘린더 목록과 access 권한이 출력된다. 아무것도 안 나오면 캘린더를
+서비스 계정 이메일과 공유하지 않은 것이다.
 
-Google 캘린더 웹에서 **빈 캘린더**를 새로 만든다 (예: `Unified`).
-기존 캘린더를 쓰지 말 것 — 미러 전용이면 사고 반경이 0이 된다.
-그 캘린더를 서비스 계정 이메일에 **"일정 변경"** 권한으로 공유한다.
+Google 캘린더 웹에서 **빈 캘린더**를 새로 만들어(예: `Unified`) 서비스 계정
+이메일에 **"일정 변경"** 권한으로 공유한다. 기존 캘린더를 쓰지 말 것.
 
 ```bash
-calhub google-calendars      # Unified의 캘린더 ID 확인, access가 writer인지 확인
+calhub google-calendars
 export GOOGLE_TARGET_CALENDAR_ID='...@group.calendar.google.com'
-```
-
-`config.yaml`의 google sink를 켠다.
-
-```bash
-calhub sync -n               # create= 건수가 예상과 맞는지
+calhub sync -n
+calhub sync
 calhub sync
 ```
 
-**통과 기준**: Google 캘린더 웹에서 Unified 캘린더에 일정이 보인다.
-
-```bash
-calhub sync                  # 한 번 더
-```
-
-**통과 기준 (중요)**: 두 번째 실행은 `create=0 update=0 unchanged=N`이어야 한다.
-create가 다시 N이면 멱등성이 깨진 것이므로 여기서 멈추고 알릴 것.
-
----
+**통과 기준**: 두 번째 실행이 `created=0 unchanged=N`.
 
 ## 5단계 — 아이폰
 
-아이폰 → 설정 → 앱 → 캘린더 → 계정 → 계정 추가 → Google → 로그인.
-캘린더 앱에서 `Unified` 체크.
+**4-A(iCloud)로 했다면 할 일이 없다.** 같은 계정이므로 이미 나타나 있다.
+안 보이면 캘린더 앱 → 하단 "캘린더" → 목록에서 `Unified` 체크.
+
+4-B(Google)로 했다면: 아이폰 → 설정 → 앱 → 캘린더 → 계정 → 계정 추가 →
+Google → 로그인. 캘린더 앱에서 `Unified` 체크.
 
 **통과 기준**: 아이폰 캘린더에 통합 일정이 보인다.
 
@@ -487,7 +526,7 @@ Google 캘린더 웹에서 일정이 지워지지 않았는지 직접 확인한�
 [ ] 1  agenda에서 기념일·D-day 날짜가 달력과 일치
 [ ] 2  out/unified.ics가 Mac 캘린더 앱에서 정상 표시
 [ ] 3  doctor에서 EventKit 캘린더 목록 확인, 회사 일정이 agenda에 표시
-[ ] 4  google-calendars에서 writer 권한 확인, 2회차 sync가 unchanged
+[ ] 4  iCloud(또는 Google) 싱크 기록, 2회차 sync가 created=0
 [ ] 5  아이폰 캘린더에 Unified 표시
 [ ] 6  소스별로 하나씩 추가, 중복 제거 동작 확인
 [ ] 6B Notion 싱크 2회차가 created=0, 버튼 더블클릭 동작 (선택)

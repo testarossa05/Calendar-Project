@@ -340,7 +340,49 @@ events:
 
 ## 3. 아이폰 연결
 
-### 방법 A — Google 전용 캘린더 (권장: 비공개 유지)
+### 방법 0 — iCloud 전용 캘린더 (가장 간단, 권장)
+
+준비물은 **앱 전용 암호 하나**뿐이다. Google Cloud 프로젝트도, 공개 호스팅도
+필요 없다. 푸시로 동기화되므로 구독 캘린더보다 반영이 빠르고, 위젯·알림·Siri가
+그대로 동작한다.
+
+1. appleid.apple.com → 로그인 및 보안 → **앱 암호** → 새로 생성
+2. `config.yaml`의 caldav 싱크를 켠다
+
+```bash
+export ICLOUD_USERNAME='testarossa05@icloud.com'
+export ICLOUD_APP_PASSWORD='xxxx-xxxx-xxxx-xxxx'
+```
+
+```yaml
+sinks:
+  - kind: caldav
+    url: https://caldav.icloud.com/
+    username: ${ICLOUD_USERNAME}
+    password: ${ICLOUD_APP_PASSWORD}
+    calendar_name: "Unified"
+```
+
+```bash
+calhub sync
+```
+
+`Unified` 캘린더가 없으면 자동 생성된다. **전용 캘린더를 쓸 것** — 기존 캘린더를
+지정하지 말라는 뜻이다. 이 도구가 쓴 일정만 수정·삭제하므로 그 캘린더에 손으로
+넣은 일정은 보존되지만, 미러 전용이면 사고 반경이 0이 된다.
+
+아이폰에서는 **따로 설정할 것이 없다.** 같은 iCloud 계정이므로 캘린더 앱에
+`Unified`가 나타난다. 안 보이면 캘린더 앱 → 캘린더 → 목록에서 체크한다.
+
+| 항목 | 동작 |
+|---|---|
+| 새 일정 | 생성 |
+| 내용 변경 | 기존 일정 수정 (중복 생성 안 함) |
+| 내용 동일 | 쓰기 없음 |
+| 일정이 사라짐 | 삭제 |
+| 손으로 만든 일정 | **건드리지 않음** |
+
+### 방법 A — Google 전용 캘린더
 
 1. Google 캘린더 웹에서 **빈 캘린더** 새로 생성 (예: "Unified")
    - 기존 캘린더를 쓰지 말 것. 미러 전용 캘린더면 사고 반경이 0이 된다.

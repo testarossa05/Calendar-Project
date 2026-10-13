@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from ..config import Config, SinkConfig
 from .base import Sink
+from .caldav_sink import CalDavSink
 from .google_sink import GoogleSink
 from .ics_file import IcsFileSink
 from .notion_sink import NotionSink
 
 SINK_TYPES: dict[str, type[Sink]] = {
+    CalDavSink.kind: CalDavSink,
     GoogleSink.kind: GoogleSink,
     IcsFileSink.kind: IcsFileSink,
     NotionSink.kind: NotionSink,

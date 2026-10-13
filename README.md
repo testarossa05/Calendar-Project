@@ -4,13 +4,14 @@ Outlook/Teams, Notion, Google Calendar, iCloud에 흩어진 일정을 **하나�
 통합해 아이폰에서 한 눈에 보기 위한 동기화 엔진.
 
 ```
-Outlook/Teams ─┬─ msgraph  (위임 권한)  ─┐
-               ├─ eventkit (Mac 로컬)   │
-               └─ ics      (게시 링크)  │   ┌─→ unified.ics → 아이폰 "구독 캘린더"
-Notion  ───────── notion / ics          ├──→┤
-Google  ───────── google                │   └─→ Google 전용 캘린더 → 아이폰 계정 동기화
-iCloud  ───────── caldav                ┘
-                                    정규화 → 중복제거
+Outlook/Teams ─┬─ msgraph  (위임 권한)  ─┐      ┌─→ iCloud 전용 캘린더 → 아이폰 (푸시)
+               ├─ eventkit (Mac 로컬)   │      │
+               └─ ics      (게시 링크)  │      ├─→ Google 전용 캘린더 → 아이폰 계정
+Notion  ───────── notion / ics          ├─────→┤
+Google  ───────── google                │      ├─→ Notion 데이터베이스
+iCloud  ───────── caldav                │      │
+기념일 ────────── local                 ┘      └─→ unified.ics (파일)
+                                  정규화 → 중복제거
 ```
 
 ## 왜 네이티브 앱이 아닌가
@@ -113,6 +114,7 @@ calhub sync         # 실제 동기화
 | kind | 결과물 | 아이폰 연결 방법 |
 |---|---|---|
 | `ics_file` | 병합된 `.ics` 파일 | 설정 → 캘린더 → 계정 → 기타 → 구독 캘린더 추가 |
+| `caldav` | iCloud 전용 캘린더에 미러링 | **설정 불필요** (같은 계정이면 자동) |
 | `google` | 전용 Google 캘린더에 미러링 | 아이폰에 Google 계정 추가 |
 | `notion` | Notion 데이터베이스에 미러링 | Notion 앱에서 확인 |
 
@@ -150,6 +152,21 @@ calhub sync         # 실제 동기화
 
 `.github/workflows/calendar-sync.yml`이 15분 주기로 동기화하고 GitHub Pages에
 게시한다. 활성화 전에 워크플로 파일 상단의 **PRIVACY WARNING**을 반드시 읽을 것.
+
+## 아이폰에 올리는 가장 쉬운 길
+
+`caldav` 싱크로 iCloud 전용 캘린더에 쓰는 것이다. **앱 전용 암호 하나**면 되고,
+Google Cloud 프로젝트도 공개 호스팅도 필요 없다. 같은 iCloud 계정이므로 아이폰에서는
+설정할 것이 없고, 푸시로 들어오므로 구독 캘린더보다 반영이 빠르다.
+
+```yaml
+sinks:
+  - kind: caldav
+    url: https://caldav.icloud.com/
+    username: ${ICLOUD_USERNAME}
+    password: ${ICLOUD_APP_PASSWORD}
+    calendar_name: "Unified"
+```
 
 ## 검증 순서
 

@@ -12,16 +12,15 @@ a view, and each event still belongs to its own system.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import icalendar
 
-from ..models import MANAGED_MARKER, OWNER_TAG, Event, SyncPlan
+from ..icalgen import PRODID, to_vevent
+from ..models import SyncPlan
 from ..util import UTC, get_tz
 from .base import Sink, SinkError
-
-PRODID = "-//calhub//Unified Calendar//EN"
 
 
 class IcsFileSink(Sink):
@@ -52,7 +51,7 @@ class IcsFileSink(Sink):
 
         stamp = datetime.now(UTC)
         for event in plan.to_create:
-            calendar.add_component(_to_vevent(event, stamp, display_tz))
+            calendar.add_component(to_vevent(event, stamp, display_tz))
 
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -61,51 +60,3 @@ class IcsFileSink(Sink):
             raise SinkError(f"could not write {path}: {exc}") from exc
 
         return {"written": len(plan.to_create), "path": str(path)}
-
-
-def _to_vevent(event: Event, stamp: datetime, display_tz: str) -> icalendar.Event:
-    vevent = icalendar.Event()
-    vevent.add("uid", f"{OWNER_TAG}-{event.key}@calhub")
-    vevent.add("dtstamp", stamp)
-    vevent.add("summary", event.title)
-
-    if event.all_day:
-        # All-day boundaries must be written as DATE values in the display zone,
-        # otherwise the phone shifts them by the UTC offset.
-        zone = get_tz(display_tz)
-        vevent.add("dtstart", event.start.astimezone(zone).date())
-        vevent.add("dtend", event.end.astimezone(zone).date())
-    else:
-        vevent.add("dtstart", event.start)
-        vevent.add("dtend", event.end)
-
-    body = _compose_description(event)
-    if body:
-        vevent.add("description", body)
-    if event.location:
-        vevent.add("location", event.location)
-    if event.url:
-        vevent.add("url", event.url)
-    if event.organizer:
-        vevent.add("organizer", f"mailto:{event.organizer}")
-    vevent.add("status", event.status.upper())
-    vevent.add("transp", "TRANSPARENT" if event.status == "tentative" else "OPAQUE")
-    # Lets a human (and a later run) see where a merged entry came from.
-    vevent.add("x-calhub-source", event.ref.source_id)
-    vevent.add("x-calhub-key", event.key)
-    return vevent
-
-
-def _compose_description(event: Event) -> str:
-    parts = []
-    if event.description:
-        parts.append(event.description)
-    # The marker lets a calendar source recognise this as our own output and skip
-    # it, so adding the unified calendar to a Mac that is also a source does not
-    # feed the tool its own events.
-    parts.append(
-        f"—\nSource: {event.ref.source_id} ({event.ref.kind}) {MANAGED_MARKER}"
-    )
-    if event.url:
-        parts.append(event.url)
-    return "\n\n".join(parts).strip()
